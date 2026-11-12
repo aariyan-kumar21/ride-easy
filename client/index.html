@@ -3,87 +3,442 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Priority-Based Cab &amp; Auto Allocation System</title>
+  <title>RideEasy — Smart Priority Cab &amp; Auto Dispatch</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <!-- App Stylesheets -->
   <link rel="stylesheet" href="./css/style.css" />
   <link rel="stylesheet" href="./css/responsive.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-brand">
-      <span class="brand-badge">SIM</span>
-      <div>
-        <h1>Smart Cab &amp; Auto Allocation</h1>
-        <p class="subtitle">Priority-aware, capacity-aware Bengaluru dispatch simulation</p>
+  <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar" aria-label="Primary Navigation">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true">
+            <i data-lucide="navigation"></i>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">RideEasy</span>
+            <span class="brand-tag">Priority Dispatch</span>
+          </div>
+        </div>
+        <button id="sidebar-close-btn" class="icon-btn mobile-only" aria-label="Close navigation">
+          <i data-lucide="x"></i>
+        </button>
       </div>
-    </div>
-    <div class="topbar-status">
-      <span id="health-indicator" class="status-pill status-checking">
-        Checking backend...
-      </span>
-    </div>
-  </header>
 
-  <main class="dashboard-layout">
-    <aside class="panel booking-panel">
-      <section class="card">
-        <h2>Ride Request</h2>
-        <p class="placeholder-note">
-          Booking form and priority rules will be enabled in upcoming milestones.
-        </p>
-      </section>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="overview">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Overview</span>
+        </button>
+        <button class="nav-item" data-section="live-map">
+          <i data-lucide="map"></i>
+          <span>Live Map</span>
+        </button>
+        <button class="nav-item" data-section="bookings">
+          <i data-lucide="ticket"></i>
+          <span>Bookings</span>
+          <span class="nav-badge" id="nav-bookings-count">6</span>
+        </button>
+        <button class="nav-item" data-section="waiting-queue">
+          <i data-lucide="list-ordered"></i>
+          <span>Waiting Queue</span>
+          <span class="nav-badge accent" id="nav-queue-count">3</span>
+        </button>
+        <button class="nav-item" data-section="fleet">
+          <i data-lucide="car"></i>
+          <span>Fleet Management</span>
+        </button>
+        <button class="nav-item" data-section="analytics">
+          <i data-lucide="bar-chart-3"></i>
+          <span>Analytics</span>
+        </button>
+        <button class="nav-item" data-section="settings">
+          <i data-lucide="settings"></i>
+          <span>Settings</span>
+        </button>
+      </nav>
 
-      <section class="card">
-        <h2>Waiting Queue</h2>
-        <p class="placeholder-note">
-          No queued bookings yet. Priority queue will appear here.
-        </p>
-      </section>
+      <div class="sidebar-footer">
+        <div class="sim-area-pill">
+          <i data-lucide="map-pin"></i>
+          <div>
+            <span class="pill-label">Demo Zone</span>
+            <strong>Bengaluru Central</strong>
+          </div>
+        </div>
+      </div>
     </aside>
 
-    <section class="panel map-panel">
-      <div class="card map-card">
-        <div class="card-header">
-          <h2>Live Dispatch Map (Bengaluru Demo Area)</h2>
-          <span class="badge-muted">Milestone 2: Leaflet + OSM</span>
-        </div>
-        <div id="map-container" class="map-placeholder">
-          <div class="map-placeholder-content">
-            <strong>Map Viewport Ready</strong>
-            <span>Leaflet.js + OpenStreetMap + OSRM routing will render here.</span>
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="main-wrapper">
+      <!-- TOP NAVIGATION -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="sidebar-toggle-btn" class="icon-btn mobile-only" aria-label="Open navigation">
+            <i data-lucide="menu"></i>
+          </button>
+          <div>
+            <h1 id="page-title" class="page-title">Dispatch Overview</h1>
+            <p class="page-subtitle">Smart Priority-Based Cab &amp; Auto Allocation System</p>
           </div>
         </div>
-      </div>
-    </section>
 
-    <aside class="panel admin-panel">
-      <section class="card">
-        <h2>Simulation &amp; Admin</h2>
-        <div class="stats-grid">
-          <div class="stat-box">
-            <span class="stat-label">Backend</span>
-            <strong id="stat-backend" class="stat-value">--</strong>
+        <div class="topbar-right">
+          <div class="sim-clock" title="Current Simulation Time">
+            <i data-lucide="clock"></i>
+            <span id="sim-time-display">16:35:00</span>
+            <span id="sim-period-badge" class="period-badge">Daytime</span>
           </div>
-          <div class="stat-box">
-            <span class="stat-label">Vehicles</span>
-            <strong class="stat-value">0</strong>
+
+          <div id="sim-status-pill" class="sim-status-pill status-paused">
+            <span class="status-dot"></span>
+            <span id="sim-status-text">Paused</span>
           </div>
-          <div class="stat-box">
-            <span class="stat-label">Active</span>
-            <strong class="stat-value">0</strong>
+
+          <div class="notification-wrapper">
+            <button id="notification-btn" class="icon-btn" aria-label="Notifications">
+              <i data-lucide="bell"></i>
+              <span class="notif-dot"></span>
+            </button>
+            <div id="notification-popover" class="notification-popover hidden" role="dialog" aria-label="Notifications">
+              <div class="popover-header">
+                <strong>Dispatch Alerts</strong>
+                <span class="muted-text">Mock feed</span>
+              </div>
+              <ul class="notif-list">
+                <li><span class="notif-tag senior">Priority</span> Senior Citizen BK-1042 prioritized (+40)</li>
+                <li><span class="notif-tag queue">Queue</span> 3 requests awaiting vehicle release</li>
+                <li><span class="notif-tag fleet">Fleet</span> CAB-04 completed trip at Indiranagar</li>
+              </ul>
+            </div>
           </div>
-          <div class="stat-box">
-            <span class="stat-label">Queued</span>
-            <strong class="stat-value">0</strong>
+
+          <div class="admin-profile">
+            <div class="avatar">OA</div>
+            <div class="profile-info">
+              <span class="profile-name">Ops Admin</span>
+              <span class="profile-role">Dispatcher</span>
+            </div>
           </div>
         </div>
-        <p class="placeholder-note">
-          Simulation controls and demo scenarios will be connected in later milestones.
-        </p>
-      </section>
-    </aside>
-  </main>
+      </header>
 
+      <!-- DASHBOARD BODY -->
+      <main class="dashboard-content">
+        <!-- MAIN STATISTICS (4 CARDS) -->
+        <section class="stats-row" aria-label="Main Statistics">
+          <article class="stat-card">
+            <div class="stat-icon purple">
+              <i data-lucide="layers"></i>
+            </div>
+            <div class="stat-body">
+              <span class="stat-label">Total Bookings</span>
+              <div class="stat-value-row">
+                <strong id="stat-total-bookings" class="stat-value">18</strong>
+                <span class="stat-delta positive">+4 today</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="stat-card">
+            <div class="stat-icon green">
+              <i data-lucide="car-front"></i>
+            </div>
+            <div class="stat-body">
+              <span class="stat-label">Available Vehicles</span>
+              <div class="stat-value-row">
+                <strong id="stat-available-vehicles" class="stat-value">5</strong>
+                <span class="stat-delta">of 10 fleet</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="stat-card">
+            <div class="stat-icon burgundy">
+              <i data-lucide="route"></i>
+            </div>
+            <div class="stat-body">
+              <span class="stat-label">Active Trips</span>
+              <div class="stat-value-row">
+                <strong id="stat-active-trips" class="stat-value">4</strong>
+                <span class="stat-delta">Live routes</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="stat-card">
+            <div class="stat-icon amber">
+              <i data-lucide="hourglass"></i>
+            </div>
+            <div class="stat-body">
+              <span class="stat-label">Waiting Requests</span>
+              <div class="stat-value-row">
+                <strong id="stat-waiting-requests" class="stat-value">3</strong>
+                <span class="stat-delta warn">Priority queue</span>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <!-- PRIMARY WORKSPACE: MAP + BOOKING PANEL -->
+        <section class="workspace-grid">
+          <!-- CENTRAL MAP SECTION -->
+          <div class="card map-section" data-panel="live-map">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="map-pinned"></i>
+                <h2>Live Dispatch Map</h2>
+                <span id="map-sim-label" class="map-status-badge">Simulation: Paused (1x)</span>
+              </div>
+              <div class="map-toolbar">
+                <button id="map-center-btn" class="btn btn-ghost btn-sm" title="Center on Bengaluru">
+                  <i data-lucide="crosshair"></i>
+                  <span>Center</span>
+                </button>
+                <button id="map-routes-toggle" class="btn btn-ghost btn-sm active" title="Toggle Routes">
+                  <i data-lucide="git-branch"></i>
+                  <span>Routes</span>
+                </button>
+                <button id="map-vehicles-toggle" class="btn btn-ghost btn-sm active" title="Toggle Vehicles">
+                  <i data-lucide="car"></i>
+                  <span>Fleet</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="map-wrapper">
+              <div id="map-container" aria-label="Interactive Bengaluru Dispatch Map"></div>
+              <div class="map-legend" aria-label="Map Legend">
+                <span class="legend-item"><i class="dot available"></i> Available</span>
+                <span class="legend-item"><i class="dot assigned"></i> To Pickup</span>
+                <span class="legend-item"><i class="dot on-trip"></i> On Trip</span>
+                <span class="legend-item"><i class="dot offline"></i> Offline</span>
+                <span class="legend-item"><i class="dot passenger"></i> Passenger</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOOKING PANEL -->
+          <aside class="card booking-section" data-panel="bookings">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="plus-circle"></i>
+                <h2>New Ride Request</h2>
+              </div>
+              <span class="badge-accent">Demo Form</span>
+            </div>
+
+            <form id="booking-form" class="booking-form" novalidate>
+              <div class="form-group">
+                <label for="pickup-input">Pickup Location</label>
+                <div class="input-with-icon">
+                  <i data-lucide="map-pin"></i>
+                  <input
+                    id="pickup-input"
+                    type="text"
+                    value="MG Road Metro Station"
+                    placeholder="Enter pickup or select preset"
+                    required
+                  />
+                </div>
+                <div class="preset-chips" data-target="pickup-input">
+                  <button type="button" class="chip" data-value="MG Road Metro Station">MG Road</button>
+                  <button type="button" class="chip" data-value="Indiranagar 100ft Rd">Indiranagar</button>
+                  <button type="button" class="chip" data-value="Koramangala 4th Block">Koramangala</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="destination-input">Destination</label>
+                <div class="input-with-icon">
+                  <i data-lucide="flag"></i>
+                  <input
+                    id="destination-input"
+                    type="text"
+                    value="Kempegowda Bus Station (Majestic)"
+                    placeholder="Enter destination"
+                    required
+                  />
+                </div>
+                <div class="preset-chips" data-target="destination-input">
+                  <button type="button" class="chip" data-value="Kempegowda Bus Station (Majestic)">Majestic</button>
+                  <button type="button" class="chip" data-value="Whitefield ITPL">Whitefield</button>
+                  <button type="button" class="chip" data-value="Jayanagar 4th Block">Jayanagar</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Vehicle Type</label>
+                <div class="segmented-control" role="radiogroup" aria-label="Vehicle Type">
+                  <label class="segment-option">
+                    <input type="radio" name="vehicleType" value="cab" checked />
+                    <span><i data-lucide="car"></i> Cab (4–6 seats)</span>
+                  </label>
+                  <label class="segment-option">
+                    <input type="radio" name="vehicleType" value="auto" />
+                    <span><i data-lucide="bike"></i> Auto (1–3 seats)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="passenger-count">Passengers</label>
+                  <input
+                    id="passenger-count"
+                    type="number"
+                    min="1"
+                    max="6"
+                    value="1"
+                    required
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="passenger-category">Category</label>
+                  <select id="passenger-category">
+                    <option value="senior">Senior Citizen (+40)</option>
+                    <option value="woman">Woman (Night +30)</option>
+                    <option value="regular" selected>Regular (+0)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="booking-feedback" class="form-feedback hidden" role="status"></div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                <i data-lucide="send"></i>
+                <span>Request Ride</span>
+              </button>
+            </form>
+          </aside>
+        </section>
+
+        <!-- SECONDARY WORKSPACE: ACTIVITY, QUEUE & SIMULATION CONTROLS -->
+        <section class="lower-grid">
+          <!-- BOOKING ACTIVITY -->
+          <div class="card activity-section" data-panel="bookings">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="activity"></i>
+                <h2>Booking Activity</h2>
+              </div>
+              <span class="muted-text">Recent requests</span>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Booking ID</th>
+                    <th>Category</th>
+                    <th>Vehicle</th>
+                    <th>Status</th>
+                    <th>Est. Pickup</th>
+                  </tr>
+                </thead>
+                <tbody id="booking-activity-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- WAITING QUEUE -->
+          <div class="card queue-section" data-panel="waiting-queue">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="list-ordered"></i>
+                <h2>Waiting Queue</h2>
+              </div>
+              <span class="badge-burgundy">Priority Ordered</span>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Pos</th>
+                    <th>Booking ID</th>
+                    <th>Priority Score</th>
+                    <th>Wait Time</th>
+                  </tr>
+                </thead>
+                <tbody id="waiting-queue-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SIMULATION CONTROLS -->
+          <div class="card simulation-section" data-panel="settings">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="sliders-horizontal"></i>
+                <h2>Simulation Controls</h2>
+              </div>
+              <span id="sim-speed-badge" class="badge-accent">1x Speed</span>
+            </div>
+
+            <div class="sim-controls-body">
+              <div class="sim-btn-grid">
+                <button id="sim-start-btn" class="btn btn-primary">
+                  <i data-lucide="play"></i>
+                  <span>Start</span>
+                </button>
+                <button id="sim-pause-btn" class="btn btn-secondary">
+                  <i data-lucide="pause"></i>
+                  <span>Pause</span>
+                </button>
+                <button id="sim-resume-btn" class="btn btn-secondary">
+                  <i data-lucide="play-circle"></i>
+                  <span>Resume</span>
+                </button>
+                <button id="sim-reset-btn" class="btn btn-danger-outline">
+                  <i data-lucide="rotate-ccw"></i>
+                  <span>Reset</span>
+                </button>
+              </div>
+
+              <div class="speed-control">
+                <label for="sim-speed-select">Simulation Speed</label>
+                <select id="sim-speed-select">
+                  <option value="1" selected>1x — Real-time</option>
+                  <option value="2">2x — Fast</option>
+                  <option value="5">5x — Demo</option>
+                  <option value="10">10x — Turbo</option>
+                </select>
+              </div>
+
+              <div class="sim-meta">
+                <p class="muted-text">
+                  Backend-driven allocation, OSRM routing, and live Socket.IO updates will connect in upcoming milestones.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Leaflet JS & Lucide Icons -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- App Entry -->
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
-

@@ -1,7 +1,7 @@
 /**
- * Socket.IO client module placeholder (Real-time sync in Milestone 7).
+ * Socket.IO client module placeholder.
+ * Real-time booking, vehicle location, queue, and simulation events will be wired in Milestone 7.
  */
 export function initSocket() {
-  // Socket.IO connection will be implemented in Milestone 7.
+  // Real-time socket connection will be enabled in Milestone 7.
 }
-
