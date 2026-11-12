@@ -1,9 +1,5 @@
-import {
-  BENGALURU_CENTER,
-  DEFAULT_ZOOM,
-  SEED_VEHICLES,
-  SEED_PASSENGERS
-} from './seedData.js';
+import { BENGALURU_CENTER, DEFAULT_ZOOM } from './seedData.js';
+import { getState, getFilteredVehicles, subscribe } from './state.js';
 
 let mapInstance = null;
 let vehicleLayer = null;
@@ -200,6 +196,62 @@ export function removePassengerMarker(passengerId) {
   return removed;
 }
 
+/**
+ * Show/hide existing vehicle markers based on active filter without deleting state.
+ */
+export function applyVehicleFilter() {
+  if (!vehicleLayer) return;
+  const visibleIds = new Set(getFilteredVehicles().map((v) => v.id));
+
+  vehicleMarkers.forEach((marker, vehicleId) => {
+    const isVisible = visibleIds.has(vehicleId);
+    if (isVisible && !vehicleLayer.hasLayer(marker)) {
+      marker.addTo(vehicleLayer);
+    } else if (!isVisible && vehicleLayer.hasLayer(marker)) {
+      vehicleLayer.removeLayer(marker);
+    }
+  });
+}
+
+export function focusVehicleOnMap(vehicleId) {
+  if (!mapInstance) return;
+  const marker = vehicleMarkers.get(vehicleId);
+  if (!marker) return;
+
+  if (!showVehicles) {
+    showVehicles = true;
+    vehicleLayer.addTo(mapInstance);
+    document.getElementById('map-vehicles-toggle')?.classList.add('active');
+  }
+  if (!vehicleLayer.hasLayer(marker)) {
+    marker.addTo(vehicleLayer);
+  }
+
+  mapInstance.setView(marker.getLatLng(), 15, { animate: true });
+  marker.openPopup();
+}
+
+export function focusPickupOnMap({ lat, lng, passengerId }) {
+  if (!mapInstance) return;
+
+  if (!showPassengers) {
+    showPassengers = true;
+    passengerLayer.addTo(mapInstance);
+    document.getElementById('map-passengers-toggle')?.classList.add('active');
+  }
+
+  const marker = passengerId ? passengerMarkers.get(passengerId) : null;
+  if (marker) {
+    mapInstance.setView(marker.getLatLng(), 15, { animate: true });
+    marker.openPopup();
+    return;
+  }
+
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    mapInstance.setView([lat, lng], 15, { animate: true });
+  }
+}
+
 export function resetMapView() {
   if (!mapInstance) return;
   mapInstance.setView(BENGALURU_CENTER, DEFAULT_ZOOM, { animate: true });
@@ -208,9 +260,17 @@ export function resetMapView() {
 export function getMarkerCounts() {
   return {
     vehicles: vehicleMarkers.size,
+    visibleVehicles: getFilteredVehicles().length,
     passengers: passengerMarkers.size,
     destinations: destinationMarkers.size
   };
+}
+
+function syncAllMarkersFromState() {
+  const { vehicles, passengers } = getState();
+  vehicles.forEach(updateVehicleMarker);
+  passengers.forEach(updatePassengerMarker);
+  applyVehicleFilter();
 }
 
 export function initMap() {
@@ -231,9 +291,20 @@ export function initMap() {
   passengerLayer = L.layerGroup().addTo(mapInstance);
   vehicleLayer = L.layerGroup().addTo(mapInstance);
 
-  // Render reproducible seed vehicles (C101-C110) and passengers (U101-U105)
-  SEED_VEHICLES.forEach(addVehicleMarker);
-  SEED_PASSENGERS.forEach(addPassengerMarker);
+  syncAllMarkersFromState();
+
+  // Keep map synchronized with centralized state
+  subscribe((_state, changeType, payload) => {
+    if (changeType === 'vehicle:updated' && payload) {
+      updateVehicleMarker(payload);
+      applyVehicleFilter();
+    } else if (changeType === 'filter:changed') {
+      applyVehicleFilter();
+    } else if (changeType === 'state:reset') {
+      syncAllMarkersFromState();
+      resetMapView();
+    }
+  });
 
   // Wire map toolbar controls
   document.getElementById('map-center-btn')?.addEventListener('click', resetMapView);
@@ -263,7 +334,6 @@ export function initMap() {
     }
   });
 
-  // Expose map marker helpers for programmatic updates & verification
   window.RideEasyMap = {
     addVehicleMarker,
     updateVehicleMarker,
@@ -271,6 +341,8 @@ export function initMap() {
     addPassengerMarker,
     updatePassengerMarker,
     removePassengerMarker,
+    focusVehicleOnMap,
+    focusPickupOnMap,
     resetMapView,
     getMarkerCounts
   };

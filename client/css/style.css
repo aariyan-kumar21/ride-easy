@@ -982,12 +982,67 @@ select:focus {
   color: var(--text-muted);
 }
 
-/* Lower Grid: Activity, Waiting Queue, Simulation Controls */
+/* Lower Grid: Activity, Waiting Queue, Fleet Overview, Simulation Controls */
 .lower-grid {
   display: grid;
-  grid-template-columns: 1.35fr 1fr 0.9fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.15rem;
-  align-items: start;
+  align-items: stretch;
+}
+
+.map-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.filter-chip {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 500;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.filter-chip:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.filter-chip.active {
+  background: linear-gradient(135deg, var(--accent-purple-soft), var(--accent-burgundy-soft));
+  border-color: rgba(139, 92, 246, 0.55);
+  color: #ffffff;
+}
+
+.fleet-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.clickable-row:hover {
+  background-color: rgba(139, 92, 246, 0.08) !important;
+}
+
+.status-select {
+  width: auto;
+  padding: 0.22rem 0.45rem;
+  font-size: 0.74rem;
+  border-radius: 999px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
 .table-responsive {

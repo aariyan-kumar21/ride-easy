@@ -1,6 +1,6 @@
 import { initMap } from './map.js';
 import { initBookingPanel } from './booking.js';
-import { initDashboard, addMockBooking } from './dashboard.js';
+import { initDashboard } from './dashboard.js';
 import { initSocket } from './socket.js';
 
 const SECTION_TITLES = {
@@ -44,7 +44,6 @@ function setupNavigation() {
         pageTitle.textContent = SECTION_TITLES[section];
       }
 
-      // Highlight matching dashboard panel(s) when selecting a section
       document.querySelectorAll('[data-panel]').forEach((panel) => {
         const isMatch = section !== 'overview' && panel.dataset.panel === section;
         panel.classList.toggle('panel-focused', isMatch);
@@ -83,8 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setupNotifications();
   initMap();
   initDashboard();
-  initBookingPanel({
-    onMockBookingCreated: (booking) => addMockBooking(booking)
-  });
+  initBookingPanel();
   initSocket();
 });

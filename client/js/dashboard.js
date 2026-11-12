@@ -1,11 +1,15 @@
-import { MOCK_BOOKINGS, MOCK_QUEUE } from './mockData.js';
-import { SEED_VEHICLES } from './seedData.js';
+import {
+  getState,
+  subscribe,
+  setVehicleFilter,
+  updateVehicleStatus,
+  setSimulationStatus,
+  setSimulationSpeed,
+  tickSimulationClock,
+  resetState
+} from './state.js';
+import { focusVehicleOnMap, focusPickupOnMap } from './map.js';
 
-let bookings = [...MOCK_BOOKINGS];
-let queue = [...MOCK_QUEUE];
-let simState = 'Paused'; // 'Running' | 'Paused' | 'Idle'
-let simSpeed = 1;
-let simClockSeconds = 16 * 3600 + 35 * 60; // 16:35:00
 let clockTimer = null;
 
 function formatClock(totalSeconds) {
@@ -15,45 +19,43 @@ function formatClock(totalSeconds) {
   return [hrs, mins, secs].map((v) => String(v).padStart(2, '0')).join(':');
 }
 
-function updateClockUI() {
+function updateClockUI(simulation) {
   const timeEl = document.getElementById('sim-time-display');
   const periodEl = document.getElementById('sim-period-badge');
-  const hour = Math.floor(simClockSeconds / 3600) % 24;
+  const hour = Math.floor(simulation.clockSeconds / 3600) % 24;
   const isNight = hour >= 22 || hour < 6;
 
-  if (timeEl) timeEl.textContent = formatClock(simClockSeconds);
-  if (periodEl) {
-    periodEl.textContent = isNight ? 'Night Hours' : 'Daytime';
-  }
+  if (timeEl) timeEl.textContent = formatClock(simulation.clockSeconds);
+  if (periodEl) periodEl.textContent = isNight ? 'Night Hours' : 'Daytime';
 }
 
 function renderStats() {
-  const totalEl = document.getElementById('stat-total-bookings');
-  const availEl = document.getElementById('stat-available-vehicles');
-  const activeEl = document.getElementById('stat-active-trips');
-  const waitEl = document.getElementById('stat-waiting-requests');
-  const navBookingsEl = document.getElementById('nav-bookings-count');
-  const navQueueEl = document.getElementById('nav-queue-count');
+  const { vehicles, bookings, queue } = getState();
+  const availableCount = vehicles.filter((v) => v.status === 'available').length;
+  const activeCount = vehicles.filter((v) => v.status === 'assigned' || v.status === 'on_trip').length;
 
-  const availableCount = SEED_VEHICLES.filter((v) => v.status === 'available').length;
-  const activeCount = bookings.filter((b) => b.status === 'assigned' || b.status === 'on_trip').length;
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(value);
+  };
 
-  if (totalEl) totalEl.textContent = String(bookings.length);
-  if (availEl) availEl.textContent = String(availableCount);
-  if (activeEl) activeEl.textContent = String(activeCount);
-  if (waitEl) waitEl.textContent = String(queue.length);
-  if (navBookingsEl) navBookingsEl.textContent = String(bookings.length);
-  if (navQueueEl) navQueueEl.textContent = String(queue.length);
+  setText('stat-total-bookings', bookings.length);
+  setText('stat-available-vehicles', availableCount);
+  setText('stat-active-trips', activeCount);
+  setText('stat-waiting-requests', queue.length);
+  setText('nav-bookings-count', bookings.length);
+  setText('nav-queue-count', queue.length);
 }
 
 function renderBookingActivity() {
   const tbody = document.getElementById('booking-activity-body');
   if (!tbody) return;
+  const { bookings } = getState();
 
   tbody.innerHTML = bookings
     .map(
       (b) => `
-      <tr>
+      <tr class="clickable-row" data-booking-id="${b.id}" title="Click to focus pickup on map">
         <td><strong>${b.id}</strong></td>
         <td>${b.category}</td>
         <td>${b.vehicle}</td>
@@ -63,16 +65,26 @@ function renderBookingActivity() {
     `
     )
     .join('');
+
+  tbody.querySelectorAll('tr[data-booking-id]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const booking = getState().bookings.find((b) => b.id === row.dataset.bookingId);
+      if (!booking) return;
+      const [lat, lng] = Array.isArray(booking.pickup) ? booking.pickup : [];
+      focusPickupOnMap({ lat, lng, passengerId: booking.passengerId });
+    });
+  });
 }
 
 function renderWaitingQueue() {
   const tbody = document.getElementById('waiting-queue-body');
   if (!tbody) return;
+  const { queue } = getState();
 
   tbody.innerHTML = queue
     .map(
       (item, index) => `
-      <tr>
+      <tr class="clickable-row" data-queue-id="${item.id}" title="Click to focus pickup on map">
         <td>#${index + 1}</td>
         <td><strong>${item.id}</strong></td>
         <td><span class="priority-pill">${item.priorityScore}</span></td>
@@ -81,78 +93,133 @@ function renderWaitingQueue() {
     `
     )
     .join('');
+
+  tbody.querySelectorAll('tr[data-queue-id]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const item = getState().queue.find((q) => q.id === row.dataset.queueId);
+      if (!item) return;
+      const [lat, lng] = Array.isArray(item.pickup) ? item.pickup : [];
+      focusPickupOnMap({ lat, lng, passengerId: item.passengerId });
+    });
+  });
 }
 
-function updateSimulationStatusUI() {
+function renderFleetList() {
+  const tbody = document.getElementById('fleet-list-body');
+  if (!tbody) return;
+  const { vehicles } = getState();
+
+  tbody.innerHTML = vehicles
+    .map(
+      (v) => `
+      <tr class="clickable-row" data-vehicle-id="${v.id}" title="Click to focus ${v.id} on map">
+        <td><strong>${v.id}</strong></td>
+        <td>${v.vehicleType}</td>
+        <td>${v.capacity}</td>
+        <td>
+          <select class="status-select" data-status-for="${v.id}" aria-label="Status for ${v.id}">
+            <option value="available" ${v.status === 'available' ? 'selected' : ''}>Available</option>
+            <option value="assigned" ${v.status === 'assigned' ? 'selected' : ''}>Assigned</option>
+            <option value="on_trip" ${v.status === 'on_trip' ? 'selected' : ''}>On Trip</option>
+            <option value="offline" ${v.status === 'offline' ? 'selected' : ''}>Offline</option>
+          </select>
+        </td>
+      </tr>
+    `
+    )
+    .join('');
+
+  tbody.querySelectorAll('tr[data-vehicle-id]').forEach((row) => {
+    row.addEventListener('click', () => {
+      focusVehicleOnMap(row.dataset.vehicleId);
+    });
+  });
+
+  tbody.querySelectorAll('select[data-status-for]').forEach((select) => {
+    select.addEventListener('click', (event) => event.stopPropagation());
+    select.addEventListener('change', (event) => {
+      updateVehicleStatus(select.dataset.statusFor, event.target.value);
+    });
+  });
+}
+
+function updateSimulationStatusUI(simulation) {
   const pill = document.getElementById('sim-status-pill');
   const text = document.getElementById('sim-status-text');
   const mapLabel = document.getElementById('map-sim-label');
   const speedBadge = document.getElementById('sim-speed-badge');
+  const speedSelect = document.getElementById('sim-speed-select');
 
-  if (pill) {
-    pill.className = `sim-status-pill status-${simState.toLowerCase()}`;
+  if (pill) pill.className = `sim-status-pill status-${simulation.status.toLowerCase()}`;
+  if (text) text.textContent = simulation.status;
+  if (mapLabel) mapLabel.textContent = `Simulation: ${simulation.status} (${simulation.speed}x)`;
+  if (speedBadge) speedBadge.textContent = `${simulation.speed}x Speed`;
+  if (speedSelect && Number(speedSelect.value) !== simulation.speed) {
+    speedSelect.value = String(simulation.speed);
   }
-  if (text) text.textContent = simState;
-  if (mapLabel) mapLabel.textContent = `Simulation: ${simState} (${simSpeed}x)`;
-  if (speedBadge) speedBadge.textContent = `${simSpeed}x Speed`;
+}
+
+function syncFilterChips(activeFilter) {
+  document.querySelectorAll('#vehicle-filter-bar .filter-chip').forEach((chip) => {
+    chip.classList.toggle('active', chip.dataset.filter === activeFilter);
+  });
 }
 
 function startClockLoop() {
   if (clockTimer) clearInterval(clockTimer);
-  clockTimer = setInterval(() => {
-    if (simState === 'Running') {
-      simClockSeconds = (simClockSeconds + simSpeed) % 86400;
-      updateClockUI();
-    }
-  }, 1000);
-}
-
-export function addMockBooking(booking) {
-  bookings = [booking, ...bookings];
-  renderStats();
-  renderBookingActivity();
+  clockTimer = setInterval(tickSimulationClock, 1000);
 }
 
 export function initDashboard() {
+  const initialState = getState();
   renderStats();
   renderBookingActivity();
   renderWaitingQueue();
-  updateClockUI();
-  updateSimulationStatusUI();
+  renderFleetList();
+  updateClockUI(initialState.simulation);
+  updateSimulationStatusUI(initialState.simulation);
+  syncFilterChips(initialState.vehicleFilter);
   startClockLoop();
 
-  document.getElementById('sim-start-btn')?.addEventListener('click', () => {
-    simState = 'Running';
-    updateSimulationStatusUI();
+  // Granular UI updates driven by the single state store
+  subscribe((state, changeType) => {
+    if (changeType === 'vehicle:updated') {
+      renderStats();
+      renderFleetList();
+    } else if (changeType === 'booking:added') {
+      renderStats();
+      renderBookingActivity();
+      renderWaitingQueue();
+    } else if (changeType === 'filter:changed') {
+      syncFilterChips(state.vehicleFilter);
+    } else if (changeType === 'simulation:updated') {
+      updateSimulationStatusUI(state.simulation);
+    } else if (changeType === 'clock:tick') {
+      updateClockUI(state.simulation);
+    } else if (changeType === 'state:reset') {
+      renderStats();
+      renderBookingActivity();
+      renderWaitingQueue();
+      renderFleetList();
+      updateClockUI(state.simulation);
+      updateSimulationStatusUI(state.simulation);
+      syncFilterChips(state.vehicleFilter);
+    }
   });
 
-  document.getElementById('sim-pause-btn')?.addEventListener('click', () => {
-    simState = 'Paused';
-    updateSimulationStatusUI();
+  // Wire vehicle filter bar
+  document.querySelectorAll('#vehicle-filter-bar .filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      setVehicleFilter(chip.dataset.filter || 'all');
+    });
   });
 
-  document.getElementById('sim-resume-btn')?.addEventListener('click', () => {
-    simState = 'Running';
-    updateSimulationStatusUI();
-  });
-
-  document.getElementById('sim-reset-btn')?.addEventListener('click', () => {
-    simState = 'Idle';
-    simSpeed = 1;
-    simClockSeconds = 16 * 3600 + 35 * 60;
-    bookings = [...MOCK_BOOKINGS];
-    queue = [...MOCK_QUEUE];
-    const speedSelect = document.getElementById('sim-speed-select');
-    if (speedSelect) speedSelect.value = '1';
-    updateClockUI();
-    updateSimulationStatusUI();
-    renderStats();
-    renderBookingActivity();
-    renderWaitingQueue();
-  });
-
+  // Wire simulation controls
+  document.getElementById('sim-start-btn')?.addEventListener('click', () => setSimulationStatus('Running'));
+  document.getElementById('sim-pause-btn')?.addEventListener('click', () => setSimulationStatus('Paused'));
+  document.getElementById('sim-resume-btn')?.addEventListener('click', () => setSimulationStatus('Running'));
+  document.getElementById('sim-reset-btn')?.addEventListener('click', resetState);
   document.getElementById('sim-speed-select')?.addEventListener('change', (event) => {
-    simSpeed = Number(event.target.value) || 1;
-    updateSimulationStatusUI();
+    setSimulationSpeed(event.target.value);
   });
 }

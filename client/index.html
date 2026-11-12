@@ -225,6 +225,15 @@
               </div>
             </div>
 
+            <div class="map-filters" id="vehicle-filter-bar" role="group" aria-label="Vehicle Filters">
+              <button type="button" class="filter-chip active" data-filter="all">All Vehicles</button>
+              <button type="button" class="filter-chip" data-filter="available">Available</button>
+              <button type="button" class="filter-chip" data-filter="assigned">Assigned</button>
+              <button type="button" class="filter-chip" data-filter="on_trip">On Trip</button>
+              <button type="button" class="filter-chip" data-filter="cab">Cabs</button>
+              <button type="button" class="filter-chip" data-filter="auto">Autos</button>
+            </div>
+
             <div class="map-wrapper">
               <div id="map-container" aria-label="Interactive Bengaluru Dispatch Map"></div>
               <div class="map-legend" aria-label="Map Legend">
@@ -380,6 +389,30 @@
                   </tr>
                 </thead>
                 <tbody id="waiting-queue-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- FLEET MANAGEMENT -->
+          <div class="card fleet-section" data-panel="fleet">
+            <div class="card-header">
+              <div class="card-title-group">
+                <i data-lucide="car"></i>
+                <h2>Fleet Overview</h2>
+              </div>
+              <span class="muted-text">Click row to focus map</span>
+            </div>
+            <div class="table-responsive fleet-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Cap</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="fleet-list-body"></tbody>
               </table>
             </div>
           </div>
