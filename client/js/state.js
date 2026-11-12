@@ -76,7 +76,8 @@ let store = {
   simulation: {
     status: 'Paused',
     speed: 1,
-    clockSeconds: 16 * 3600 + 35 * 60
+    clockSeconds: 16 * 3600 + 35 * 60,
+    notifications: []
   }
 };
 
@@ -178,13 +179,47 @@ export async function startTrip(bookingId) {
   return updated;
 }
 
-export function setSimulationStatus(status) {
-  store.simulation.status = status;
-  notify('simulation:updated', store.simulation);
+export async function refreshSimulationSnapshot() {
+  try {
+    const [vehiclesRes, bookingsRes, queueRes, simRes] = await Promise.all([
+      api.getVehicles(),
+      api.getBookings(),
+      api.getQueue(),
+      api.getSimulationState()
+    ]);
+
+    store.vehicles = (vehiclesRes.vehicles || []).map(mapVehicle);
+    store.bookings = (bookingsRes.bookings || []).map(mapBooking);
+    store.queue = (queueRes.queue || []).map(mapQueueItem);
+    store.simulation.status = simRes.status || store.simulation.status;
+    store.simulation.speed = simRes.speed || store.simulation.speed;
+    store.simulation.notifications = simRes.notifications || [];
+    notify('data:loaded', store);
+  } catch (err) {
+    console.error('Snapshot refresh failed:', err);
+  }
 }
 
-export function setSimulationSpeed(speed) {
-  store.simulation.speed = Number(speed) || 1;
+export async function setSimulationStatus(action) {
+  let simRes;
+  if (action === 'Running') {
+    simRes = await api.startSimulation();
+  } else if (action === 'Paused') {
+    simRes = await api.pauseSimulation();
+  } else if (action === 'Resume') {
+    simRes = await api.resumeSimulation();
+  }
+  if (simRes) {
+    store.simulation.status = simRes.status;
+    store.simulation.speed = simRes.speed;
+    store.simulation.notifications = simRes.notifications || [];
+    notify('simulation:updated', store.simulation);
+  }
+}
+
+export async function setSimulationSpeed(speed) {
+  const simRes = await api.setSimulationSpeed(Number(speed) || 1);
+  store.simulation.speed = simRes.speed;
   notify('simulation:updated', store.simulation);
 }
 
@@ -196,10 +231,12 @@ export function tickSimulationClock() {
 
 export async function resetState() {
   store.vehicleFilter = 'all';
+  const simRes = await api.resetSimulation();
   store.simulation = {
-    status: 'Idle',
-    speed: 1,
-    clockSeconds: 16 * 3600 + 35 * 60
+    status: simRes.status || 'Idle',
+    speed: simRes.speed || 1,
+    clockSeconds: 16 * 3600 + 35 * 60,
+    notifications: simRes.notifications || []
   };
   await loadInitialData();
   notify('state:reset', store);

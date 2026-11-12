@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { calculatePriority } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
 const { getRouteEstimate } = require('../services/routing.service');
+const { removeVehicleTrack } = require('../services/simulation.service');
 
 const VALID_VEHICLE_TYPES = ['cab', 'auto'];
 const VALID_CATEGORIES = ['senior', 'woman', 'regular'];
@@ -179,6 +180,7 @@ async function cancelBooking(req, res, next) {
 
     let allocationResult = null;
     if (assignedVehicleId) {
+      removeVehicleTrack(assignedVehicleId);
       await Vehicle.updateOne(
         { vehicleId: assignedVehicleId, currentBookingId: booking.bookingId },
         { $set: { status: 'available', currentBookingId: null } }

@@ -26,7 +26,7 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
       },
       {
         $set: {
-          status: 'assigned',
+          status: 'to_pickup',
           currentBookingId: booking.bookingId
         }
       },

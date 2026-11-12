@@ -37,6 +37,16 @@ export const api = {
       method: 'POST'
     }),
   getQueue: () => request('/api/queue'),
-  getAdminStats: () => request('/api/admin/stats')
+  getAdminStats: () => request('/api/admin/stats'),
+  getSimulationState: () => request('/api/simulation/state'),
+  startSimulation: () => request('/api/simulation/start', { method: 'POST' }),
+  pauseSimulation: () => request('/api/simulation/pause', { method: 'POST' }),
+  resumeSimulation: () => request('/api/simulation/resume', { method: 'POST' }),
+  setSimulationSpeed: (speed) =>
+    request('/api/simulation/speed', {
+      method: 'POST',
+      body: JSON.stringify({ speed })
+    }),
+  resetSimulation: () => request('/api/simulation/reset', { method: 'POST' })
 };
 

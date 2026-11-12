@@ -70,7 +70,7 @@ describe('Smart Cab & Auto Allocation Engine', () => {
     assert.equal(result.allocated.length, 1);
     assert.equal(result.allocated[0].vehicleId, 'C101');
     assert.equal(BookingModel.docs[0].status, 'assigned');
-    assert.equal(VehicleModel.docs.find((v) => v.vehicleId === 'C101').status, 'assigned');
+    assert.equal(VehicleModel.docs.find((v) => v.vehicleId === 'C101').status, 'to_pickup');
     assert.equal(VehicleModel.docs.find((v) => v.vehicleId === 'C102').status, 'available');
   });
 

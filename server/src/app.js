@@ -6,6 +6,7 @@ const healthRoutes = require('./routes/health.routes');
 const vehicleRoutes = require('./routes/vehicle.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const adminRoutes = require('./routes/admin.routes');
+const simulationRoutes = require('./routes/simulation.routes');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -35,6 +36,7 @@ app.use(express.json());
 app.use('/api/health', healthRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/simulation', simulationRoutes);
 app.use('/api', adminRoutes);
 
 // Serve static frontend files

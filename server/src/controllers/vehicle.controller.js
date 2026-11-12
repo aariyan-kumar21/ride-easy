@@ -1,6 +1,7 @@
 const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
 const { runAllocationCycle } = require('../services/allocation.service');
+const { removeVehicleTrack } = require('../services/simulation.service');
 
 const ALLOWED_STATUSES = ['available', 'assigned', 'to_pickup', 'on_trip', 'offline'];
 
@@ -41,8 +42,9 @@ async function updateVehicleStatus(req, res, next) {
       });
     }
 
-    // If vehicle is taken offline or returned to available, clear currentBookingId safely
+    // If vehicle is taken offline or returned to available, clear currentBookingId and track safely
     if (status === 'available' || status === 'offline') {
+      removeVehicleTrack(id);
       if (vehicle.currentBookingId) {
         await Booking.updateOne(
           { bookingId: vehicle.currentBookingId, status: { $in: ['assigned', 'to_pickup'] } },
