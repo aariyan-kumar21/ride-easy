@@ -264,6 +264,27 @@ function updateSimulationStatusUI(simulation) {
   if (speedSelect && Number(speedSelect.value) !== simulation.speed) {
     speedSelect.value = String(simulation.speed);
   }
+
+  const notifList = document.getElementById('notification-list');
+  const notifCountLabel = document.getElementById('notif-count-label');
+  const alerts = simulation.notifications || [];
+  if (notifCountLabel) {
+    notifCountLabel.textContent = alerts.length > 0 ? `${alerts.length} alerts` : 'Live feed';
+  }
+  if (notifList) {
+    notifList.innerHTML =
+      alerts.length === 0
+        ? '<li class="muted-text">No dispatch alerts yet.</li>'
+        : alerts
+            .slice(0, 6)
+            .map(
+              (n) =>
+                `<li><span class="notif-tag ${n.type === 'pickup_arrived' ? 'senior' : 'fleet'}">${
+                  n.type === 'pickup_arrived' ? 'Pickup' : n.type === 'trip_completed' ? 'Done' : 'Sim'
+                }</span> ${n.message}</li>`
+            )
+            .join('');
+  }
 }
 
 function syncFilterChips(activeFilter) {
@@ -327,12 +348,24 @@ export function initDashboard() {
     });
   });
 
-  document.getElementById('sim-start-btn')?.addEventListener('click', () => setSimulationStatus('Running'));
-  document.getElementById('sim-pause-btn')?.addEventListener('click', () => setSimulationStatus('Paused'));
-  document.getElementById('sim-resume-btn')?.addEventListener('click', () => setSimulationStatus('Resume'));
-  document.getElementById('sim-reset-btn')?.addEventListener('click', () => resetState());
+  const handleSimAction = async (fn) => {
+    try {
+      await fn();
+    } catch (err) {
+      const banner = document.getElementById('api-status-banner');
+      if (banner) {
+        banner.textContent = `Simulation Error: ${err.message || 'Backend unavailable'}`;
+        banner.className = 'api-banner error';
+      }
+    }
+  };
+
+  document.getElementById('sim-start-btn')?.addEventListener('click', () => handleSimAction(() => setSimulationStatus('Running')));
+  document.getElementById('sim-pause-btn')?.addEventListener('click', () => handleSimAction(() => setSimulationStatus('Paused')));
+  document.getElementById('sim-resume-btn')?.addEventListener('click', () => handleSimAction(() => setSimulationStatus('Resume')));
+  document.getElementById('sim-reset-btn')?.addEventListener('click', () => handleSimAction(() => resetState()));
   document.getElementById('sim-speed-select')?.addEventListener('change', (event) => {
-    setSimulationSpeed(event.target.value);
+    handleSimAction(() => setSimulationSpeed(event.target.value));
   });
 
   const scenarioSelect = document.getElementById('scenario-select');
