@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Priority-Based Cab &amp; Auto Allocation System</title>
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="./css/responsive.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="brand-badge">SIM</span>
+      <div>
+        <h1>Smart Cab &amp; Auto Allocation</h1>
+        <p class="subtitle">Priority-aware, capacity-aware Bengaluru dispatch simulation</p>
+      </div>
+    </div>
+    <div class="topbar-status">
+      <span id="health-indicator" class="status-pill status-checking">
+        Checking backend...
+      </span>
+    </div>
+  </header>
+
+  <main class="dashboard-layout">
+    <aside class="panel booking-panel">
+      <section class="card">
+        <h2>Ride Request</h2>
+        <p class="placeholder-note">
+          Booking form and priority rules will be enabled in upcoming milestones.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Waiting Queue</h2>
+        <p class="placeholder-note">
+          No queued bookings yet. Priority queue will appear here.
+        </p>
+      </section>
+    </aside>
+
+    <section class="panel map-panel">
+      <div class="card map-card">
+        <div class="card-header">
+          <h2>Live Dispatch Map (Bengaluru Demo Area)</h2>
+          <span class="badge-muted">Milestone 2: Leaflet + OSM</span>
+        </div>
+        <div id="map-container" class="map-placeholder">
+          <div class="map-placeholder-content">
+            <strong>Map Viewport Ready</strong>
+            <span>Leaflet.js + OpenStreetMap + OSRM routing will render here.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel admin-panel">
+      <section class="card">
+        <h2>Simulation &amp; Admin</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">Backend</span>
+            <strong id="stat-backend" class="stat-value">--</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Vehicles</span>
+            <strong class="stat-value">0</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Active</span>
+            <strong class="stat-value">0</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Queued</span>
+            <strong class="stat-value">0</strong>
+          </div>
+        </div>
+        <p class="placeholder-note">
+          Simulation controls and demo scenarios will be connected in later milestones.
+        </p>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
+

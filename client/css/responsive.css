@@ -1,0 +1,33 @@
+@media (max-width: 1120px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .map-panel {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .map-placeholder {
+    min-height: 360px;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    padding: 0.85rem 1rem;
+  }
+
+  .map-placeholder {
+    min-height: 280px;
+  }
+}
+

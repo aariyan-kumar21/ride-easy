@@ -1,0 +1,11 @@
+{
+  "name": "smart-cab-allocation",
+  "version": "1.0.0",
+  "description": "Smart Priority-Based Cab & Auto Allocation System (Full-Stack Web Simulation)",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix server start",
+    "dev": "npm --prefix server run dev"
+  }
+}
+
