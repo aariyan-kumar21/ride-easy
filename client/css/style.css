@@ -1045,6 +1045,46 @@ select:focus {
   cursor: pointer;
 }
 
+.api-banner {
+  padding: 0.65rem 0.95rem;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+}
+
+.api-banner.loading {
+  background-color: var(--accent-purple-soft);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #ddd6fe;
+}
+
+.api-banner.error {
+  background-color: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.form-feedback.feedback-error {
+  background-color: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.btn-xs {
+  padding: 0.18rem 0.5rem;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: transparent;
+  color: #fca5a5;
+  cursor: pointer;
+}
+
+.btn-xs:hover {
+  background-color: rgba(239, 68, 68, 0.16);
+}
+
 .table-responsive {
   overflow-x: auto;
 }

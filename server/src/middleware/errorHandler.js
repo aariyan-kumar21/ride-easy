@@ -4,7 +4,7 @@
 function notFoundHandler(req, res, next) {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({
-      error: 'Not Found',
+      error: 'NotFound',
       message: `Route ${req.method} ${req.originalUrl} does not exist`
     });
   }
@@ -13,14 +13,42 @@ function notFoundHandler(req, res, next) {
 
 /**
  * Global Express error-handling middleware.
+ * Masks internal DB/driver errors so credentials or raw stack traces are never exposed.
  */
 function errorHandler(err, req, res, _next) {
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'ValidationError',
+      message: 'Request data failed schema validation'
+    });
+  }
+
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      error: 'InvalidIdentifier',
+      message: 'Invalid identifier format'
+    });
+  }
+
+  if (err.code === 11000) {
+    return res.status(409).json({
+      error: 'Conflict',
+      message: 'A record with this identifier already exists'
+    });
+  }
+
   const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({
-    error: err.name || 'InternalServerError',
-    message: err.message || 'An unexpected error occurred'
+  const safeMessage =
+    statusCode >= 500 ? 'An unexpected server error occurred' : err.message || 'Request failed';
+
+  if (statusCode >= 500) {
+    console.error('Unhandled server error:', err.message);
+  }
+
+  return res.status(statusCode).json({
+    error: statusCode >= 500 ? 'InternalServerError' : err.name || 'RequestError',
+    message: safeMessage
   });
 }
 
 module.exports = { notFoundHandler, errorHandler };
-

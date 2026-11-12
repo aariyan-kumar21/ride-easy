@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const healthRoutes = require('./routes/health.routes');
+const vehicleRoutes = require('./routes/vehicle.routes');
+const bookingRoutes = require('./routes/booking.routes');
+const adminRoutes = require('./routes/admin.routes');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -17,7 +20,6 @@ const allowedOrigins = new Set([
 app.use(
   cors({
     origin(origin, callback) {
-      // Allow same-origin/non-browser requests (no Origin header) or configured local dev origins.
       if (!origin || allowedOrigins.has(origin)) {
         return callback(null, true);
       }
@@ -31,6 +33,9 @@ app.use(express.json());
 
 // API routes
 app.use('/api/health', healthRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api', adminRoutes);
 
 // Serve static frontend files
 const clientDir = path.resolve(__dirname, '../../client');
@@ -48,4 +53,3 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 module.exports = app;
-

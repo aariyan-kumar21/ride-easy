@@ -2,7 +2,8 @@ import {
   getState,
   subscribe,
   setVehicleFilter,
-  updateVehicleStatus,
+  changeVehicleStatus,
+  cancelBooking,
   setSimulationStatus,
   setSimulationSpeed,
   tickSimulationClock,
@@ -29,10 +30,27 @@ function updateClockUI(simulation) {
   if (periodEl) periodEl.textContent = isNight ? 'Night Hours' : 'Daytime';
 }
 
+function updateBanner() {
+  const banner = document.getElementById('api-status-banner');
+  if (!banner) return;
+  const { loading, error } = getState();
+
+  if (error) {
+    banner.textContent = `Backend Error: ${error}`;
+    banner.className = 'api-banner error';
+  } else if (loading) {
+    banner.textContent = 'Loading simulation data from MongoDB...';
+    banner.className = 'api-banner loading';
+  } else {
+    banner.className = 'api-banner hidden';
+    banner.textContent = '';
+  }
+}
+
 function renderStats() {
   const { vehicles, bookings, queue } = getState();
   const availableCount = vehicles.filter((v) => v.status === 'available').length;
-  const activeCount = vehicles.filter((v) => v.status === 'assigned' || v.status === 'on_trip').length;
+  const activeCount = vehicles.filter((v) => v.status === 'assigned' || v.status === 'on_trip' || v.status === 'to_pickup').length;
 
   const setText = (id, value) => {
     const el = document.getElementById(id);
@@ -50,7 +68,24 @@ function renderStats() {
 function renderBookingActivity() {
   const tbody = document.getElementById('booking-activity-body');
   if (!tbody) return;
-  const { bookings } = getState();
+  const { bookings, loading, error } = getState();
+
+  if (loading && bookings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted-text">Loading bookings...</td></tr>';
+    return;
+  }
+
+  if (error && bookings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted-text">Unable to load bookings.</td></tr>';
+    return;
+  }
+
+  if (bookings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted-text">No bookings yet. Submit a request to begin.</td></tr>';
+    return;
+  }
+
+  const cancellable = new Set(['requested', 'queued', 'assigned']);
 
   tbody.innerHTML = bookings
     .map(
@@ -60,7 +95,13 @@ function renderBookingActivity() {
         <td>${b.category}</td>
         <td>${b.vehicle}</td>
         <td><span class="status-pill ${b.status}">${b.status.replace('_', ' ')}</span></td>
-        <td>${b.estPickup}</td>
+        <td>
+          ${
+            cancellable.has(b.status)
+              ? `<button type="button" class="btn-xs btn-cancel" data-cancel-id="${b.id}">Cancel</button>`
+              : b.estPickup
+          }
+        </td>
       </tr>
     `
     )
@@ -71,7 +112,20 @@ function renderBookingActivity() {
       const booking = getState().bookings.find((b) => b.id === row.dataset.bookingId);
       if (!booking) return;
       const [lat, lng] = Array.isArray(booking.pickup) ? booking.pickup : [];
-      focusPickupOnMap({ lat, lng, passengerId: booking.passengerId });
+      focusPickupOnMap({ lat, lng, passengerId: booking.userId });
+    });
+  });
+
+  tbody.querySelectorAll('button[data-cancel-id]').forEach((btn) => {
+    btn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      btn.disabled = true;
+      try {
+        await cancelBooking(btn.dataset.cancelId);
+      } catch (err) {
+        alert(err.message || 'Could not cancel booking');
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -79,7 +133,17 @@ function renderBookingActivity() {
 function renderWaitingQueue() {
   const tbody = document.getElementById('waiting-queue-body');
   if (!tbody) return;
-  const { queue } = getState();
+  const { queue, loading } = getState();
+
+  if (loading && queue.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted-text">Loading queue...</td></tr>';
+    return;
+  }
+
+  if (queue.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted-text">Waiting queue is empty.</td></tr>';
+    return;
+  }
 
   tbody.innerHTML = queue
     .map(
@@ -99,7 +163,7 @@ function renderWaitingQueue() {
       const item = getState().queue.find((q) => q.id === row.dataset.queueId);
       if (!item) return;
       const [lat, lng] = Array.isArray(item.pickup) ? item.pickup : [];
-      focusPickupOnMap({ lat, lng, passengerId: item.passengerId });
+      focusPickupOnMap({ lat, lng, passengerId: item.userId });
     });
   });
 }
@@ -107,7 +171,17 @@ function renderWaitingQueue() {
 function renderFleetList() {
   const tbody = document.getElementById('fleet-list-body');
   if (!tbody) return;
-  const { vehicles } = getState();
+  const { vehicles, loading } = getState();
+
+  if (loading && vehicles.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted-text">Loading fleet...</td></tr>';
+    return;
+  }
+
+  if (vehicles.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted-text">No vehicles found in database.</td></tr>';
+    return;
+  }
 
   tbody.innerHTML = vehicles
     .map(
@@ -120,6 +194,7 @@ function renderFleetList() {
           <select class="status-select" data-status-for="${v.id}" aria-label="Status for ${v.id}">
             <option value="available" ${v.status === 'available' ? 'selected' : ''}>Available</option>
             <option value="assigned" ${v.status === 'assigned' ? 'selected' : ''}>Assigned</option>
+            <option value="to_pickup" ${v.status === 'to_pickup' ? 'selected' : ''}>To Pickup</option>
             <option value="on_trip" ${v.status === 'on_trip' ? 'selected' : ''}>On Trip</option>
             <option value="offline" ${v.status === 'offline' ? 'selected' : ''}>Offline</option>
           </select>
@@ -137,8 +212,16 @@ function renderFleetList() {
 
   tbody.querySelectorAll('select[data-status-for]').forEach((select) => {
     select.addEventListener('click', (event) => event.stopPropagation());
-    select.addEventListener('change', (event) => {
-      updateVehicleStatus(select.dataset.statusFor, event.target.value);
+    select.addEventListener('change', async (event) => {
+      const vehicleId = select.dataset.statusFor;
+      const newStatus = event.target.value;
+      select.disabled = true;
+      try {
+        await changeVehicleStatus(vehicleId, newStatus);
+      } catch (err) {
+        alert(err.message || 'Failed to update vehicle status');
+        renderFleetList();
+      }
     });
   });
 }
@@ -181,12 +264,17 @@ export function initDashboard() {
   syncFilterChips(initialState.vehicleFilter);
   startClockLoop();
 
-  // Granular UI updates driven by the single state store
   subscribe((state, changeType) => {
-    if (changeType === 'vehicle:updated') {
+    if (changeType === 'loading:changed' || changeType === 'data:loaded' || changeType === 'data:error') {
+      updateBanner();
+      renderStats();
+      renderBookingActivity();
+      renderWaitingQueue();
+      renderFleetList();
+    } else if (changeType === 'vehicle:updated') {
       renderStats();
       renderFleetList();
-    } else if (changeType === 'booking:added') {
+    } else if (changeType === 'booking:added' || changeType === 'booking:updated') {
       renderStats();
       renderBookingActivity();
       renderWaitingQueue();
@@ -197,6 +285,7 @@ export function initDashboard() {
     } else if (changeType === 'clock:tick') {
       updateClockUI(state.simulation);
     } else if (changeType === 'state:reset') {
+      updateBanner();
       renderStats();
       renderBookingActivity();
       renderWaitingQueue();
@@ -207,18 +296,16 @@ export function initDashboard() {
     }
   });
 
-  // Wire vehicle filter bar
   document.querySelectorAll('#vehicle-filter-bar .filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
       setVehicleFilter(chip.dataset.filter || 'all');
     });
   });
 
-  // Wire simulation controls
   document.getElementById('sim-start-btn')?.addEventListener('click', () => setSimulationStatus('Running'));
   document.getElementById('sim-pause-btn')?.addEventListener('click', () => setSimulationStatus('Paused'));
   document.getElementById('sim-resume-btn')?.addEventListener('click', () => setSimulationStatus('Running'));
-  document.getElementById('sim-reset-btn')?.addEventListener('click', resetState);
+  document.getElementById('sim-reset-btn')?.addEventListener('click', () => resetState());
   document.getElementById('sim-speed-select')?.addEventListener('change', (event) => {
     setSimulationSpeed(event.target.value);
   });

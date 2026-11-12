@@ -295,7 +295,9 @@ export function initMap() {
 
   // Keep map synchronized with centralized state
   subscribe((_state, changeType, payload) => {
-    if (changeType === 'vehicle:updated' && payload) {
+    if (changeType === 'data:loaded') {
+      syncAllMarkersFromState();
+    } else if (changeType === 'vehicle:updated' && payload) {
       updateVehicleMarker(payload);
       applyVehicleFilter();
     } else if (changeType === 'filter:changed') {

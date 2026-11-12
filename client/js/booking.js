@@ -1,10 +1,4 @@
-import { addBooking, getState } from './state.js';
-
-const CATEGORY_LABELS = {
-  senior: 'Senior Citizen',
-  woman: 'Woman',
-  regular: 'Regular'
-};
+import { createBooking } from './state.js';
 
 const LOCATION_COORDS = {
   'MG Road Metro Station': [12.9756, 77.6066],
@@ -15,16 +9,20 @@ const LOCATION_COORDS = {
   'Jayanagar 4th Block': [12.9304, 77.5830]
 };
 
-function showFeedback(el, message) {
+function showFeedback(el, message, isError = false) {
   if (!el) return;
   el.textContent = message;
-  el.classList.remove('hidden');
+  el.classList.remove('hidden', 'feedback-error');
+  if (isError) {
+    el.classList.add('feedback-error');
+  }
 }
 
 export function initBookingPanel() {
   const form = document.getElementById('booking-form');
   const feedbackEl = document.getElementById('booking-feedback');
   const passengerInput = document.getElementById('passenger-count');
+  const submitBtn = form?.querySelector('button[type="submit"]');
 
   document.querySelectorAll('.preset-chips').forEach((group) => {
     const targetId = group.dataset.target;
@@ -36,52 +34,53 @@ export function initBookingPanel() {
     });
   });
 
-  form?.addEventListener('submit', (event) => {
+  form?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    const pickup = document.getElementById('pickup-input')?.value.trim();
-    const destination = document.getElementById('destination-input')?.value.trim();
+    const pickupLabel = document.getElementById('pickup-input')?.value.trim();
+    const destLabel = document.getElementById('destination-input')?.value.trim();
     const vehicleType = form.querySelector('input[name="vehicleType"]:checked')?.value || 'cab';
     const passengerCount = Number(passengerInput?.value || 1);
-    const categoryKey = document.getElementById('passenger-category')?.value || 'regular';
+    const category = document.getElementById('passenger-category')?.value || 'regular';
 
-    if (!pickup || !destination) {
-      showFeedback(feedbackEl, 'Please provide both pickup and destination locations.');
+    if (!pickupLabel || !destLabel) {
+      showFeedback(feedbackEl, 'Please provide both pickup and destination locations.', true);
       return;
     }
 
     if (vehicleType === 'auto' && passengerCount > 3) {
-      showFeedback(feedbackEl, 'Auto supports at most 3 passengers. Switch to Cab for larger groups.');
+      showFeedback(feedbackEl, 'Auto supports at most 3 passengers. Switch to Cab for larger groups.', true);
       return;
     }
 
     if (passengerCount < 1 || passengerCount > 6) {
-      showFeedback(feedbackEl, 'Passenger count must be between 1 and 6.');
+      showFeedback(feedbackEl, 'Passenger count must be between 1 and 6.', true);
       return;
     }
 
-    const { vehicles } = getState();
-    const availableMatch = vehicles.find(
-      (v) =>
-        v.status === 'available' &&
-        v.vehicleType.toLowerCase() === vehicleType &&
-        v.capacity >= passengerCount
-    );
+    const [pickupLat, pickupLng] = LOCATION_COORDS[pickupLabel] || [12.9716, 77.5946];
+    const [destLat, destLng] = LOCATION_COORDS[destLabel] || [12.9784, 77.6408];
 
-    const newBooking = {
-      id: `BK-${Math.floor(1046 + Math.random() * 900)}`,
-      category: CATEGORY_LABELS[categoryKey] || 'Regular',
-      vehicle: availableMatch ? availableMatch.id : 'Pending',
-      status: availableMatch ? 'assigned' : 'queued',
-      estPickup: availableMatch ? '4 min' : '—',
-      pickup: LOCATION_COORDS[pickup] || [12.9716, 77.5946],
-      destination: LOCATION_COORDS[destination] || [12.9784, 77.6408]
-    };
+    if (submitBtn) submitBtn.disabled = true;
+    showFeedback(feedbackEl, 'Submitting booking request...');
 
-    addBooking(newBooking);
-    showFeedback(
-      feedbackEl,
-      `Mock request ${newBooking.id} added (${newBooking.category}, ${vehicleType.toUpperCase()}, ${passengerCount} pax).`
-    );
+    try {
+      const created = await createBooking({
+        category,
+        vehicleType,
+        passengerCount,
+        pickup: { lat: pickupLat, lng: pickupLng, label: pickupLabel },
+        destination: { lat: destLat, lng: destLng, label: destLabel }
+      });
+
+      showFeedback(
+        feedbackEl,
+        `Booking ${created.id} created with status "${created.status}" (pending allocation).`
+      );
+    } catch (err) {
+      showFeedback(feedbackEl, err.message || 'Failed to create booking.', true);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
 }

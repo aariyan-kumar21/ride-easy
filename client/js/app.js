@@ -2,6 +2,7 @@ import { initMap } from './map.js';
 import { initBookingPanel } from './booking.js';
 import { initDashboard } from './dashboard.js';
 import { initSocket } from './socket.js';
+import { loadInitialData } from './state.js';
 
 const SECTION_TITLES = {
   overview: 'Dispatch Overview',
@@ -84,4 +85,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboard();
   initBookingPanel();
   initSocket();
+  loadInitialData();
 });
