@@ -52,6 +52,8 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
             priorityBreakdown: booking.priorityBreakdown,
             estimatedPickupMinutes: candidate.route.durationMinutes,
             routeDistanceMeters: candidate.route.distanceMeters,
+            routeDurationSeconds: candidate.route.durationSeconds,
+            isEstimatedRoute: Boolean(candidate.route.isEstimated),
             routeGeometry: candidate.route.geometry
           }
         },

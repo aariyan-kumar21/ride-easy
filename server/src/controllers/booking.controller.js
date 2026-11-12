@@ -3,6 +3,7 @@ const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const { calculatePriority } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
+const { getRouteEstimate } = require('../services/routing.service');
 
 const VALID_VEHICLE_TYPES = ['cab', 'auto'];
 const VALID_CATEGORIES = ['senior', 'woman', 'regular'];
@@ -194,10 +195,53 @@ async function cancelBooking(req, res, next) {
   }
 }
 
+async function startTrip(req, res, next) {
+  try {
+    const { id } = req.params;
+    const booking = await Booking.findOne({ bookingId: id });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: 'NotFound',
+        message: `Booking ${id} not found`
+      });
+    }
+
+    if (!['assigned', 'to_pickup', 'arrived'].includes(booking.status)) {
+      return res.status(400).json({
+        error: 'InvalidStateTransition',
+        message: `Cannot start trip for booking with status "${booking.status}"`
+      });
+    }
+
+    const tripRoute = await getRouteEstimate(booking.pickup, booking.destination);
+
+    booking.status = 'on_trip';
+    booking.routeGeometry = tripRoute.geometry;
+    booking.routeDistanceMeters = tripRoute.distanceMeters;
+    booking.routeDurationSeconds = tripRoute.durationSeconds;
+    booking.estimatedPickupMinutes = tripRoute.durationMinutes;
+    booking.isEstimatedRoute = Boolean(tripRoute.isEstimated);
+    await booking.save();
+
+    if (booking.vehicleId) {
+      await Vehicle.updateOne(
+        { vehicleId: booking.vehicleId },
+        { $set: { status: 'on_trip' } }
+      );
+    }
+
+    return res.status(200).json({ booking: booking.toObject() });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   listBookings,
   getBookingById,
   createBooking,
-  cancelBooking
+  cancelBooking,
+  startTrip
 };
 

@@ -32,6 +32,10 @@ export const api = {
     request(`/api/bookings/${encodeURIComponent(bookingId)}/cancel`, {
       method: 'POST'
     }),
+  startTrip: (bookingId) =>
+    request(`/api/bookings/${encodeURIComponent(bookingId)}/start`, {
+      method: 'POST'
+    }),
   getQueue: () => request('/api/queue'),
   getAdminStats: () => request('/api/admin/stats')
 };

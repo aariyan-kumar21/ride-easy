@@ -2,15 +2,17 @@ import { BENGALURU_CENTER, DEFAULT_ZOOM } from './seedData.js';
 import { getState, getFilteredVehicles, subscribe } from './state.js';
 
 let mapInstance = null;
+let routeLayerGroup = null;
 let vehicleLayer = null;
 let passengerLayer = null;
 let showVehicles = true;
 let showPassengers = true;
 
-// Marker reference maps for in-place updates without recreating the map
+// Marker & route reference maps for in-place updates without recreating the map
 const vehicleMarkers = new Map();
 const passengerMarkers = new Map();
 const destinationMarkers = new Map();
+const routeLayers = new Map();
 
 const VEHICLE_STATUS_STYLES = {
   available: { color: '#22c55e', label: 'Available' },
@@ -266,11 +268,82 @@ export function getMarkerCounts() {
   };
 }
 
+function formatDistanceKm(meters) {
+  if (meters === null || meters === undefined) return '—';
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
+export function removeBookingRoute(bookingId) {
+  if (!routeLayerGroup) return false;
+  const existing = routeLayers.get(bookingId);
+  if (!existing) return false;
+  routeLayerGroup.removeLayer(existing);
+  routeLayers.delete(bookingId);
+  return true;
+}
+
+export function upsertBookingRoute(booking) {
+  if (!routeLayerGroup || !booking) return null;
+
+  const activeRouteStatuses = new Set(['assigned', 'to_pickup', 'on_trip']);
+  if (!activeRouteStatuses.has(booking.status) || !Array.isArray(booking.routeGeometry) || booking.routeGeometry.length < 2) {
+    removeBookingRoute(booking.id);
+    return null;
+  }
+
+  // Replace only this booking's polyline without disturbing other bookings' routes
+  removeBookingRoute(booking.id);
+
+  const isTrip = booking.status === 'on_trip';
+  const polyline = L.polyline(booking.routeGeometry, {
+    color: isTrip ? '#38bdf8' : '#a855f7',
+    weight: 4,
+    opacity: 0.9,
+    dashArray: isTrip ? null : '8 6'
+  });
+
+  const etaText = booking.estimatedPickupMinutes ? `${booking.estimatedPickupMinutes} min` : '—';
+  const estSuffix = booking.isEstimatedRoute ? ' (est.)' : '';
+  const popupHtml = isTrip
+    ? `<div class="map-popup">
+         <div class="popup-title">${booking.id} &middot; On Trip</div>
+         <div><strong>Destination:</strong> ${booking.destinationLabel || 'Selected destination'}</div>
+         <div><strong>Trip ETA:</strong> ${etaText}${estSuffix}</div>
+         <div><strong>Distance:</strong> ${formatDistanceKm(booking.routeDistanceMeters)}</div>
+       </div>`
+    : `<div class="map-popup">
+         <div class="popup-title">${booking.id} &middot; To Pickup</div>
+         <div><strong>Vehicle:</strong> ${booking.vehicle}</div>
+         <div><strong>Est. Pickup:</strong> ${etaText}${estSuffix}</div>
+         <div><strong>Distance:</strong> ${formatDistanceKm(booking.routeDistanceMeters)}</div>
+       </div>`;
+
+  polyline.bindPopup(popupHtml);
+  polyline.addTo(routeLayerGroup);
+  routeLayers.set(booking.id, polyline);
+  return polyline;
+}
+
+function syncAllRoutesFromState() {
+  const { bookings } = getState();
+  const activeIds = new Set();
+  bookings.forEach((b) => {
+    const layer = upsertBookingRoute(b);
+    if (layer) activeIds.add(b.id);
+  });
+  routeLayers.forEach((_layer, bookingId) => {
+    if (!activeIds.has(bookingId)) {
+      removeBookingRoute(bookingId);
+    }
+  });
+}
+
 function syncAllMarkersFromState() {
   const { vehicles, passengers } = getState();
   vehicles.forEach(updateVehicleMarker);
   passengers.forEach(updatePassengerMarker);
   applyVehicleFilter();
+  syncAllRoutesFromState();
 }
 
 export function initMap() {
@@ -288,18 +361,23 @@ export function initMap() {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(mapInstance);
 
+  routeLayerGroup = L.layerGroup().addTo(mapInstance);
   passengerLayer = L.layerGroup().addTo(mapInstance);
   vehicleLayer = L.layerGroup().addTo(mapInstance);
 
   syncAllMarkersFromState();
 
   // Keep map synchronized with centralized state
-  subscribe((_state, changeType, payload) => {
+  subscribe((state, changeType, payload) => {
     if (changeType === 'data:loaded') {
       syncAllMarkersFromState();
     } else if (changeType === 'vehicle:updated' && payload) {
       updateVehicleMarker(payload);
       applyVehicleFilter();
+    } else if ((changeType === 'booking:added' || changeType === 'booking:updated') && payload) {
+      upsertBookingRoute(payload);
+      const vehicle = state.vehicles.find((v) => v.id === payload.vehicle);
+      if (vehicle) updateVehicleMarker(vehicle);
     } else if (changeType === 'filter:changed') {
       applyVehicleFilter();
     } else if (changeType === 'state:reset') {
@@ -345,6 +423,8 @@ export function initMap() {
     removePassengerMarker,
     focusVehicleOnMap,
     focusPickupOnMap,
+    upsertBookingRoute,
+    removeBookingRoute,
     resetMapView,
     getMarkerCounts
   };

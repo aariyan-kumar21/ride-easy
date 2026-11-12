@@ -97,6 +97,14 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: null
     },
+    routeDurationSeconds: {
+      type: Number,
+      default: null
+    },
+    isEstimatedRoute: {
+      type: Boolean,
+      default: false
+    },
     routeGeometry: {
       type: [[Number]],
       default: []

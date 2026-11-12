@@ -4,6 +4,7 @@ import {
   setVehicleFilter,
   changeVehicleStatus,
   cancelBooking,
+  startTrip,
   setSimulationStatus,
   setSimulationSpeed,
   tickSimulationClock,
@@ -88,23 +89,26 @@ function renderBookingActivity() {
   const cancellable = new Set(['requested', 'queued', 'assigned']);
 
   tbody.innerHTML = bookings
-    .map(
-      (b) => `
+    .map((b) => {
+      const distKm = b.routeDistanceMeters != null ? ` · ${(b.routeDistanceMeters / 1000).toFixed(1)} km` : '';
+      const etaLabel = `${b.estPickup}${distKm}`;
+      const canStart = b.status === 'assigned' || b.status === 'to_pickup';
+      const canCancel = cancellable.has(b.status);
+
+      return `
       <tr class="clickable-row" data-booking-id="${b.id}" title="Click to focus pickup on map">
         <td><strong>${b.id}</strong></td>
         <td>${b.category}</td>
         <td>${b.vehicle}</td>
         <td><span class="status-pill ${b.status}">${b.status.replace('_', ' ')}</span></td>
         <td>
-          ${
-            cancellable.has(b.status)
-              ? `<button type="button" class="btn-xs btn-cancel" data-cancel-id="${b.id}">Cancel</button>`
-              : b.estPickup
-          }
+          <span>${etaLabel}</span>
+          ${canStart ? `<button type="button" class="btn-xs" style="border-color:rgba(56,189,248,0.5);color:#7dd3fc;margin-left:4px;" data-start-id="${b.id}">Start</button>` : ''}
+          ${canCancel ? `<button type="button" class="btn-xs btn-cancel" style="margin-left:4px;" data-cancel-id="${b.id}">Cancel</button>` : ''}
         </td>
       </tr>
-    `
-    )
+    `;
+    })
     .join('');
 
   tbody.querySelectorAll('tr[data-booking-id]').forEach((row) => {
@@ -113,6 +117,19 @@ function renderBookingActivity() {
       if (!booking) return;
       const [lat, lng] = Array.isArray(booking.pickup) ? booking.pickup : [];
       focusPickupOnMap({ lat, lng, passengerId: booking.userId });
+    });
+  });
+
+  tbody.querySelectorAll('button[data-start-id]').forEach((btn) => {
+    btn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      btn.disabled = true;
+      try {
+        await startTrip(btn.dataset.startId);
+      } catch (err) {
+        alert(err.message || 'Could not start trip');
+        btn.disabled = false;
+      }
     });
   });
 

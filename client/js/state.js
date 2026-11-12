@@ -37,9 +37,15 @@ function mapBooking(b) {
         : '—',
     pickup: b.pickup ? [b.pickup.lat, b.pickup.lng] : null,
     destination: b.destination ? [b.destination.lat, b.destination.lng] : null,
+    destinationLabel: b.destination?.label || '',
     passengerCount: b.passengerCount,
     vehicleType: b.vehicleType,
-    priorityScore: b.priorityScore || 0
+    priorityScore: b.priorityScore || 0,
+    estimatedPickupMinutes: b.estimatedPickupMinutes ?? null,
+    routeDistanceMeters: b.routeDistanceMeters ?? null,
+    routeDurationSeconds: b.routeDurationSeconds ?? null,
+    isEstimatedRoute: Boolean(b.isEstimatedRoute),
+    routeGeometry: Array.isArray(b.routeGeometry) ? b.routeGeometry : []
   };
 }
 
@@ -155,6 +161,19 @@ export async function cancelBooking(bookingId) {
   const updated = mapBooking(res.booking);
   store.bookings = store.bookings.map((b) => (b.id === updated.id ? updated : b));
   store.queue = store.queue.filter((q) => q.id !== updated.id);
+  notify('booking:updated', updated);
+  return updated;
+}
+
+export async function startTrip(bookingId) {
+  const res = await api.startTrip(bookingId);
+  const updated = mapBooking(res.booking);
+  store.bookings = store.bookings.map((b) => (b.id === updated.id ? updated : b));
+  if (updated.vehicle && updated.vehicle !== 'Pending') {
+    store.vehicles = store.vehicles.map((v) =>
+      v.id === updated.vehicle ? { ...v, status: 'on_trip' } : v
+    );
+  }
   notify('booking:updated', updated);
   return updated;
 }
