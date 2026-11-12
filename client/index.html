@@ -429,6 +429,23 @@
             </div>
 
             <div class="sim-controls-body">
+              <div class="speed-control">
+                <label for="scenario-select">Demo Scenario</label>
+                <div style="display:flex;gap:0.5rem;">
+                  <select id="scenario-select">
+                    <option value="normal_daytime">1. Normal Daytime (14:00)</option>
+                    <option value="peak_hour">2. Peak-Hour Demand (18:15)</option>
+                    <option value="night_priority">3. Night-Time Priority (22:30)</option>
+                    <option value="group_booking">4. Group Booking Capacity (15:00)</option>
+                    <option value="vehicle_cancellation">5. Vehicle Cancellation (16:00)</option>
+                  </select>
+                  <button id="scenario-generate-btn" type="button" class="btn btn-secondary btn-sm">
+                    Generate
+                  </button>
+                </div>
+                <span id="scenario-feedback" class="muted-text"></span>
+              </div>
+
               <div class="sim-btn-grid">
                 <button id="sim-start-btn" class="btn btn-primary">
                   <i data-lucide="play"></i>

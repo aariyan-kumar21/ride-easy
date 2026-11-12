@@ -47,6 +47,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ speed })
     }),
-  resetSimulation: () => request('/api/simulation/reset', { method: 'POST' })
+  resetSimulation: () => request('/api/simulation/reset', { method: 'POST' }),
+  getScenarios: () => request('/api/simulation/scenarios'),
+  generateScenario: (name) =>
+    request(`/api/simulation/scenarios/${encodeURIComponent(name)}/generate`, {
+      method: 'POST'
+    })
 };
 

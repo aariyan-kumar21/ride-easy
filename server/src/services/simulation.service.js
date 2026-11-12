@@ -15,6 +15,9 @@ let tickTimer = null;
 let isStepping = false;
 const activeTracks = new Map(); // vehicleId -> track state
 let notifications = [];
+let activeScenario = null;
+let simulatedTimeISO = null;
+let simulatedTimeLabel = 'Daytime (Live Demo)';
 
 function getSocketEmitter() {
   try {
@@ -259,7 +262,12 @@ async function stepSimulation(options = {}) {
   }
 
   if (completedAnyTrip) {
-    const allocResult = await allocationService.runAllocationCycle({ BookingModel, VehicleModel, routingService });
+    const allocResult = await allocationService.runAllocationCycle({
+      BookingModel,
+      VehicleModel,
+      routingService,
+      now: simulatedTimeISO ? new Date(simulatedTimeISO) : new Date()
+    });
     const emitter = getSocketEmitter();
     if (emitter) {
       emitter.emitAllocationCompleted(allocResult);
@@ -333,6 +341,9 @@ async function resetSimulation(options = {}) {
   stopTickLoop();
   activeTracks.clear();
   notifications = [];
+  activeScenario = null;
+  simulatedTimeISO = null;
+  simulatedTimeLabel = 'Daytime (Live Demo)';
 
   if (!options.skipDbReset) {
     await Promise.all([
@@ -350,10 +361,26 @@ async function resetSimulation(options = {}) {
   return getSimulationState();
 }
 
+function setSimulationContext({ scenarioId = null, simulatedTime = null, timeLabel = 'Daytime (Live Demo)', notice = null }) {
+  stopTickLoop();
+  simStatus = 'Paused';
+  activeTracks.clear();
+  activeScenario = scenarioId;
+  simulatedTimeISO = simulatedTime;
+  simulatedTimeLabel = timeLabel;
+  if (notice) {
+    pushNotification('scenario', notice);
+  }
+  return getSimulationState();
+}
+
 function getSimulationState() {
   return {
     status: simStatus,
     speed: simSpeed,
+    activeScenario,
+    simulatedTime: simulatedTimeISO,
+    simulatedTimeLabel,
     activeTracksCount: activeTracks.size,
     tracks: Array.from(activeTracks.values()).map((t) => ({
       vehicleId: t.vehicleId,
@@ -376,6 +403,7 @@ module.exports = {
   pauseSimulation,
   resumeSimulation,
   setSimulationSpeed,
+  setSimulationContext,
   resetSimulation,
   getSimulationState
 };

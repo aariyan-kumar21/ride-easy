@@ -8,6 +8,7 @@ import {
   setSimulationStatus,
   setSimulationSpeed,
   tickSimulationClock,
+  runScenario,
   resetState
 } from './state.js';
 import { focusVehicleOnMap, focusPickupOnMap } from './map.js';
@@ -28,7 +29,13 @@ function updateClockUI(simulation) {
   const isNight = hour >= 22 || hour < 6;
 
   if (timeEl) timeEl.textContent = formatClock(simulation.clockSeconds);
-  if (periodEl) periodEl.textContent = isNight ? 'Night Hours' : 'Daytime';
+  if (periodEl) {
+    periodEl.textContent = simulation.simulatedTimeLabel
+      ? `Sim: ${simulation.simulatedTimeLabel}`
+      : isNight
+      ? 'Night Hours'
+      : 'Daytime';
+  }
 }
 
 function updateBanner() {
@@ -165,11 +172,11 @@ function renderWaitingQueue() {
   tbody.innerHTML = queue
     .map(
       (item, index) => `
-      <tr class="clickable-row" data-queue-id="${item.id}" title="Click to focus pickup on map">
+      <tr class="clickable-row" data-queue-id="${item.id}" title="${item.priorityReason || 'Click to focus pickup on map'}">
         <td>#${index + 1}</td>
         <td><strong>${item.id}</strong></td>
-        <td><span class="priority-pill">${item.priorityScore}</span></td>
-        <td>${item.waitMinutes} min</td>
+        <td><span class="priority-pill" title="${item.priorityReason}">${item.priorityScore}</span></td>
+        <td>${item.waitMinutes} min${item.priorityReason ? ` · <span class="muted-text">${item.priorityReason}</span>` : ''}</td>
       </tr>
     `
     )
@@ -299,6 +306,7 @@ export function initDashboard() {
       syncFilterChips(state.vehicleFilter);
     } else if (changeType === 'simulation:updated') {
       updateSimulationStatusUI(state.simulation);
+      updateClockUI(state.simulation);
     } else if (changeType === 'clock:tick') {
       updateClockUI(state.simulation);
     } else if (changeType === 'state:reset') {
@@ -325,5 +333,27 @@ export function initDashboard() {
   document.getElementById('sim-reset-btn')?.addEventListener('click', () => resetState());
   document.getElementById('sim-speed-select')?.addEventListener('change', (event) => {
     setSimulationSpeed(event.target.value);
+  });
+
+  const scenarioSelect = document.getElementById('scenario-select');
+  const scenarioBtn = document.getElementById('scenario-generate-btn');
+  const scenarioFeedback = document.getElementById('scenario-feedback');
+
+  scenarioBtn?.addEventListener('click', async () => {
+    const scenarioId = scenarioSelect?.value || 'normal_daytime';
+    scenarioBtn.disabled = true;
+    if (scenarioFeedback) scenarioFeedback.textContent = 'Generating scenario...';
+    try {
+      const res = await runScenario(scenarioId);
+      const allocCount = res.allocation?.allocated?.length ?? 0;
+      const queueCount = res.allocation?.queued?.length ?? 0;
+      if (scenarioFeedback) {
+        scenarioFeedback.textContent = `Loaded (${res.simulatedTimeLabel}): ${allocCount} allocated, ${queueCount} queued.`;
+      }
+    } catch (err) {
+      if (scenarioFeedback) scenarioFeedback.textContent = err.message || 'Scenario generation failed.';
+    } finally {
+      scenarioBtn.disabled = false;
+    }
   });
 }

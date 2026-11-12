@@ -5,7 +5,9 @@ const {
   pause,
   resume,
   setSpeed,
-  reset
+  reset,
+  getScenarios,
+  generateScenario
 } = require('../controllers/simulation.controller');
 
 const router = express.Router();
@@ -16,6 +18,8 @@ router.post('/pause', pause);
 router.post('/resume', resume);
 router.post('/speed', setSpeed);
 router.post('/reset', reset);
+router.get('/scenarios', getScenarios);
+router.post('/scenarios/:name/generate', generateScenario);
 
 module.exports = router;
 

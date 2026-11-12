@@ -41,6 +41,7 @@ function mapBooking(b) {
     passengerCount: b.passengerCount,
     vehicleType: b.vehicleType,
     priorityScore: b.priorityScore || 0,
+    priorityBreakdown: b.priorityBreakdown || null,
     estimatedPickupMinutes: b.estimatedPickupMinutes ?? null,
     routeDistanceMeters: b.routeDistanceMeters ?? null,
     routeDurationSeconds: b.routeDurationSeconds ?? null,
@@ -56,6 +57,7 @@ function mapQueueItem(q) {
     priorityScore: q.priorityScore ?? 0,
     waitMinutes: q.waitMinutes ?? 0,
     category: CATEGORY_LABELS[q.category] || q.category || 'Regular',
+    priorityReason: q.priorityBreakdown?.reason || '',
     pickup: q.pickup ? [q.pickup.lat, q.pickup.lng] : null
   };
 }
@@ -249,11 +251,36 @@ export function applyQueueUpdated(queueList) {
 }
 
 export function applySimulationState(sim) {
-  if (!sim) return;
-  store.simulation.status = sim.status || store.simulation.status;
-  store.simulation.speed = sim.speed || store.simulation.speed;
-  store.simulation.notifications = sim.notifications || store.simulation.notifications;
-  notify('simulation:updated', store.simulation);
+  if (sim) {
+    store.simulation.status = sim.status || store.simulation.status;
+    store.simulation.speed = sim.speed || store.simulation.speed;
+    store.simulation.simulatedTimeLabel = sim.simulatedTimeLabel || 'Daytime (Live Demo)';
+    store.simulation.simulatedTime = sim.simulatedTime || null;
+    if (sim.simulatedTime) {
+      const dt = new Date(sim.simulatedTime);
+      store.simulation.clockSeconds = dt.getHours() * 3600 + dt.getMinutes() * 60 + dt.getSeconds();
+    }
+    store.simulation.notifications = sim.notifications || store.simulation.notifications;
+    notify('simulation:updated', store.simulation);
+  }
+}
+
+export async function runScenario(scenarioId) {
+  store.loading = true;
+  notify('loading:changed', true);
+  try {
+    const res = await api.generateScenario(scenarioId);
+    if (res.simulation) {
+      applySimulationState(res.simulation);
+    }
+    await loadInitialData();
+    return res;
+  } catch (err) {
+    store.loading = false;
+    store.error = err.message || 'Failed to generate scenario';
+    notify('data:error', store.error);
+    throw err;
+  }
 }
 
 export async function refreshSimulationSnapshot() {

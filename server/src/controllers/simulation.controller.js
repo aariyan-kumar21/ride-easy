@@ -1,4 +1,5 @@
 const simulationService = require('../services/simulation.service');
+const scenarioService = require('../services/scenario.service');
 const socketHandler = require('../sockets/socket.handler');
 
 function getState(req, res) {
@@ -56,5 +57,38 @@ async function reset(req, res, next) {
   }
 }
 
-module.exports = { getState, start, pause, resume, setSpeed, reset };
+function getScenarios(req, res) {
+  res.status(200).json({ scenarios: scenarioService.listScenarios() });
+}
+
+async function generateScenario(req, res, next) {
+  try {
+    const { name } = req.params;
+    const result = await scenarioService.generateScenario(name);
+
+    const notice = result.cancellationEvent
+      ? `Scenario "${name}" loaded: ${result.cancellationEvent.cancelledVehicleId} cancelled -> ${result.cancellationEvent.affectedBookingId} reassigned to ${result.cancellationEvent.reallocatedTo}`
+      : `Scenario "${name}" loaded (${result.simulatedTimeLabel})`;
+
+    const simState = simulationService.setSimulationContext({
+      scenarioId: name,
+      simulatedTime: result.simulatedTime,
+      timeLabel: result.simulatedTimeLabel,
+      notice
+    });
+
+    socketHandler.emitSimulationState(simState);
+    const io = socketHandler.getIO();
+    if (io) {
+      const sockets = await io.fetchSockets();
+      await Promise.all(sockets.map((s) => socketHandler.sendFullSync(s)));
+    }
+
+    res.status(200).json({ ...result, simulation: simState });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getState, start, pause, resume, setSpeed, reset, getScenarios, generateScenario };
 
