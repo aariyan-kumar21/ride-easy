@@ -204,13 +204,19 @@
                 <span id="map-sim-label" class="map-status-badge">Simulation: Paused (1x)</span>
               </div>
               <div class="map-toolbar">
-                <button id="map-center-btn" class="btn btn-ghost btn-sm" title="Center on Bengaluru">
-                  <i data-lucide="crosshair"></i>
-                  <span>Center</span>
+                <button id="map-zoom-in-btn" class="btn btn-ghost btn-sm" title="Zoom In">
+                  <i data-lucide="zoom-in"></i>
                 </button>
-                <button id="map-routes-toggle" class="btn btn-ghost btn-sm active" title="Toggle Routes">
-                  <i data-lucide="git-branch"></i>
-                  <span>Routes</span>
+                <button id="map-zoom-out-btn" class="btn btn-ghost btn-sm" title="Zoom Out">
+                  <i data-lucide="zoom-out"></i>
+                </button>
+                <button id="map-center-btn" class="btn btn-ghost btn-sm" title="Reset Map View">
+                  <i data-lucide="crosshair"></i>
+                  <span>Reset View</span>
+                </button>
+                <button id="map-passengers-toggle" class="btn btn-ghost btn-sm active" title="Toggle Passengers">
+                  <i data-lucide="users"></i>
+                  <span>Passengers</span>
                 </button>
                 <button id="map-vehicles-toggle" class="btn btn-ghost btn-sm active" title="Toggle Vehicles">
                   <i data-lucide="car"></i>
@@ -222,11 +228,11 @@
             <div class="map-wrapper">
               <div id="map-container" aria-label="Interactive Bengaluru Dispatch Map"></div>
               <div class="map-legend" aria-label="Map Legend">
-                <span class="legend-item"><i class="dot available"></i> Available</span>
-                <span class="legend-item"><i class="dot assigned"></i> To Pickup</span>
-                <span class="legend-item"><i class="dot on-trip"></i> On Trip</span>
-                <span class="legend-item"><i class="dot offline"></i> Offline</span>
-                <span class="legend-item"><i class="dot passenger"></i> Passenger</span>
+                <span class="legend-item"><i class="dot available"></i> Available vehicle</span>
+                <span class="legend-item"><i class="dot assigned"></i> Assigned vehicle</span>
+                <span class="legend-item"><i class="dot on-trip"></i> On-trip vehicle</span>
+                <span class="legend-item"><i class="dot passenger"></i> Passenger pickup</span>
+                <span class="legend-item"><i class="dot destination"></i> Passenger destination</span>
               </div>
             </div>
           </div>

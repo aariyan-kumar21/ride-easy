@@ -1,4 +1,5 @@
-import { MOCK_BOOKINGS, MOCK_QUEUE, MOCK_VEHICLES } from './mockData.js';
+import { MOCK_BOOKINGS, MOCK_QUEUE } from './mockData.js';
+import { SEED_VEHICLES } from './seedData.js';
 
 let bookings = [...MOCK_BOOKINGS];
 let queue = [...MOCK_QUEUE];
@@ -34,7 +35,7 @@ function renderStats() {
   const navBookingsEl = document.getElementById('nav-bookings-count');
   const navQueueEl = document.getElementById('nav-queue-count');
 
-  const availableCount = MOCK_VEHICLES.filter((v) => v.status === 'available').length;
+  const availableCount = SEED_VEHICLES.filter((v) => v.status === 'available').length;
   const activeCount = bookings.filter((b) => b.status === 'assigned' || b.status === 'on_trip').length;
 
   if (totalEl) totalEl.textContent = String(bookings.length);
