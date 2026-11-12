@@ -3,6 +3,7 @@ const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const { sortRequestsByPriority } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
+const socketHandler = require('../sockets/socket.handler');
 
 async function getQueue(req, res, next) {
   try {
@@ -89,6 +90,8 @@ async function getAdminStats(req, res, next) {
 async function triggerAllocation(req, res, next) {
   try {
     const result = await runAllocationCycle();
+    socketHandler.emitAllocationCompleted(result);
+    await socketHandler.broadcastQueueSnapshot();
     res.status(200).json(result);
   } catch (err) {
     next(err);

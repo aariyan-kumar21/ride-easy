@@ -8,13 +8,11 @@ import {
   setSimulationStatus,
   setSimulationSpeed,
   tickSimulationClock,
-  refreshSimulationSnapshot,
   resetState
 } from './state.js';
 import { focusVehicleOnMap, focusPickupOnMap } from './map.js';
 
 let clockTimer = null;
-let syncTimer = null;
 
 function formatClock(totalSeconds) {
   const hrs = Math.floor(totalSeconds / 3600) % 24;
@@ -270,13 +268,6 @@ function syncFilterChips(activeFilter) {
 function startClockLoop() {
   if (clockTimer) clearInterval(clockTimer);
   clockTimer = setInterval(tickSimulationClock, 1000);
-
-  if (syncTimer) clearInterval(syncTimer);
-  syncTimer = setInterval(() => {
-    if (getState().simulation.status === 'Running') {
-      refreshSimulationSnapshot();
-    }
-  }, 800);
 }
 
 export function initDashboard() {
@@ -300,7 +291,7 @@ export function initDashboard() {
     } else if (changeType === 'vehicle:updated') {
       renderStats();
       renderFleetList();
-    } else if (changeType === 'booking:added' || changeType === 'booking:updated') {
+    } else if (changeType === 'booking:added' || changeType === 'booking:updated' || changeType === 'queue:updated') {
       renderStats();
       renderBookingActivity();
       renderWaitingQueue();

@@ -16,6 +16,14 @@ let isStepping = false;
 const activeTracks = new Map(); // vehicleId -> track state
 let notifications = [];
 
+function getSocketEmitter() {
+  try {
+    return require('../sockets/socket.handler');
+  } catch {
+    return null;
+  }
+}
+
 function pushNotification(type, message) {
   const entry = {
     id: `N-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -169,6 +177,13 @@ async function stepSimulation(options = {}) {
         { vehicleId },
         { $set: { latitude: pos.lat, longitude: pos.lng } }
       );
+      getSocketEmitter()?.emitCabLocation({
+        vehicleId,
+        latitude: pos.lat,
+        longitude: pos.lng,
+        status: track.phase === 'on_trip' ? 'on_trip' : 'to_pickup',
+        currentBookingId: booking.bookingId
+      });
     }
 
     // Check if vehicle reached end of current route
@@ -208,6 +223,15 @@ async function stepSimulation(options = {}) {
         track.phase = 'on_trip';
         track.profile = buildRouteProfile(tripRoute.geometry);
         track.distanceTraveled = 0;
+
+        const emitter = getSocketEmitter();
+        if (emitter) {
+          const updatedBooking = await BookingModel.findOne({ bookingId: booking.bookingId });
+          const updatedVehicle = await VehicleModel.findOne({ vehicleId });
+          if (updatedBooking) emitter.emitBookingUpdated(updatedBooking);
+          if (updatedVehicle) emitter.emitCabStatus(updatedVehicle);
+          emitter.emitSimulationState(getSimulationState());
+        }
       } else if (track.phase === 'on_trip') {
         // Reached destination -> completed & release vehicle
         await BookingModel.updateOne(
@@ -221,12 +245,26 @@ async function stepSimulation(options = {}) {
         pushNotification('trip_completed', `Trip ${booking.bookingId} completed by ${vehicleId}`);
         activeTracks.delete(vehicleId);
         completedAnyTrip = true;
+
+        const emitter = getSocketEmitter();
+        if (emitter) {
+          const updatedBooking = await BookingModel.findOne({ bookingId: booking.bookingId });
+          const updatedVehicle = await VehicleModel.findOne({ vehicleId });
+          if (updatedBooking) emitter.emitBookingUpdated(updatedBooking);
+          if (updatedVehicle) emitter.emitCabStatus(updatedVehicle);
+          emitter.emitSimulationState(getSimulationState());
+        }
       }
     }
   }
 
   if (completedAnyTrip) {
-    await allocationService.runAllocationCycle({ BookingModel, VehicleModel, routingService });
+    const allocResult = await allocationService.runAllocationCycle({ BookingModel, VehicleModel, routingService });
+    const emitter = getSocketEmitter();
+    if (emitter) {
+      emitter.emitAllocationCompleted(allocResult);
+      await emitter.broadcastQueueSnapshot();
+    }
   }
 
   return { stepped: true, activeTracks: activeTracks.size };

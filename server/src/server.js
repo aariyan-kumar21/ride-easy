@@ -2,6 +2,7 @@ const http = require('http');
 const app = require('./app');
 const env = require('./config/env');
 const { connectDB, disconnectDB } = require('./config/db');
+const { initSocket } = require('./sockets/socket.handler');
 
 let server;
 
@@ -14,6 +15,7 @@ async function startServer() {
   }
 
   server = http.createServer(app);
+  initSocket(server);
   server.listen(env.port, () => {
     console.log(`Smart Cab Allocation server running on http://localhost:${env.port} (${env.nodeEnv})`);
   });

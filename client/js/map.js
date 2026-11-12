@@ -371,7 +371,7 @@ export function initMap() {
   subscribe((state, changeType, payload) => {
     if (changeType === 'data:loaded') {
       syncAllMarkersFromState();
-    } else if (changeType === 'vehicle:updated' && payload) {
+    } else if ((changeType === 'vehicle:updated' || changeType === 'cab:location') && payload) {
       updateVehicleMarker(payload);
       applyVehicleFilter();
     } else if ((changeType === 'booking:added' || changeType === 'booking:updated') && payload) {

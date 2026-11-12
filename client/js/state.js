@@ -179,6 +179,83 @@ export async function startTrip(bookingId) {
   return updated;
 }
 
+export function applyStateSync(payload) {
+  if (!payload) return;
+  if (Array.isArray(payload.vehicles)) {
+    store.vehicles = payload.vehicles.map(mapVehicle);
+  }
+  if (Array.isArray(payload.bookings)) {
+    store.bookings = payload.bookings.map(mapBooking);
+  }
+  if (Array.isArray(payload.queue)) {
+    store.queue = payload.queue.map(mapQueueItem);
+  }
+  if (payload.simulation) {
+    store.simulation.status = payload.simulation.status || store.simulation.status;
+    store.simulation.speed = payload.simulation.speed || store.simulation.speed;
+    store.simulation.notifications = payload.simulation.notifications || [];
+  }
+  store.loading = false;
+  store.error = null;
+  notify('data:loaded', store);
+}
+
+export function applyBookingUpsert(rawBooking, isNew = false) {
+  if (!rawBooking) return;
+  const mapped = mapBooking(rawBooking);
+  const exists = store.bookings.some((b) => b.id === mapped.id);
+  if (exists) {
+    store.bookings = store.bookings.map((b) => (b.id === mapped.id ? mapped : b));
+    notify('booking:updated', mapped);
+  } else {
+    store.bookings = [mapped, ...store.bookings];
+    notify(isNew ? 'booking:added' : 'booking:updated', mapped);
+  }
+}
+
+export function applyCabLocation(payload) {
+  if (!payload?.vehicleId) return;
+  let updatedVehicle = null;
+  store.vehicles = store.vehicles.map((v) => {
+    if (v.id !== payload.vehicleId) return v;
+    updatedVehicle = {
+      ...v,
+      lat: payload.latitude,
+      lng: payload.longitude,
+      status: payload.status || v.status,
+      currentBookingId: payload.currentBookingId ?? v.currentBookingId
+    };
+    return updatedVehicle;
+  });
+  if (updatedVehicle) {
+    notify('cab:location', updatedVehicle);
+  }
+}
+
+export function applyCabStatus(rawVehicle) {
+  if (!rawVehicle) return;
+  const mapped = mapVehicle(rawVehicle);
+  const exists = store.vehicles.some((v) => v.id === mapped.id);
+  store.vehicles = exists
+    ? store.vehicles.map((v) => (v.id === mapped.id ? mapped : v))
+    : [...store.vehicles, mapped];
+  notify('vehicle:updated', mapped);
+}
+
+export function applyQueueUpdated(queueList) {
+  if (!Array.isArray(queueList)) return;
+  store.queue = queueList.map(mapQueueItem);
+  notify('queue:updated', store.queue);
+}
+
+export function applySimulationState(sim) {
+  if (!sim) return;
+  store.simulation.status = sim.status || store.simulation.status;
+  store.simulation.speed = sim.speed || store.simulation.speed;
+  store.simulation.notifications = sim.notifications || store.simulation.notifications;
+  notify('simulation:updated', store.simulation);
+}
+
 export async function refreshSimulationSnapshot() {
   try {
     const [vehiclesRes, bookingsRes, queueRes, simRes] = await Promise.all([

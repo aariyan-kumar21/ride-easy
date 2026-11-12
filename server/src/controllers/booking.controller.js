@@ -5,6 +5,7 @@ const { calculatePriority } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
 const { getRouteEstimate } = require('../services/routing.service');
 const { removeVehicleTrack } = require('../services/simulation.service');
+const socketHandler = require('../sockets/socket.handler');
 
 const VALID_VEHICLE_TYPES = ['cab', 'auto'];
 const VALID_CATEGORIES = ['senior', 'woman', 'regular'];
@@ -144,9 +145,18 @@ async function createBooking(req, res, next) {
 
     const allocationResult = await runAllocationCycle();
     const updatedBooking = await Booking.findOne({ bookingId: booking.bookingId }).lean();
+    const finalBooking = updatedBooking || booking.toObject();
+
+    socketHandler.emitBookingCreated(finalBooking);
+    socketHandler.emitAllocationCompleted(allocationResult);
+    if (finalBooking.vehicleId) {
+      const veh = await Vehicle.findOne({ vehicleId: finalBooking.vehicleId }).lean();
+      if (veh) socketHandler.emitCabStatus(veh);
+    }
+    await socketHandler.broadcastQueueSnapshot();
 
     return res.status(201).json({
-      booking: updatedBooking || booking.toObject(),
+      booking: finalBooking,
       allocation: allocationResult
     });
   } catch (err) {
@@ -181,12 +191,18 @@ async function cancelBooking(req, res, next) {
     let allocationResult = null;
     if (assignedVehicleId) {
       removeVehicleTrack(assignedVehicleId);
-      await Vehicle.updateOne(
+      const released = await Vehicle.findOneAndUpdate(
         { vehicleId: assignedVehicleId, currentBookingId: booking.bookingId },
-        { $set: { status: 'available', currentBookingId: null } }
-      );
+        { $set: { status: 'available', currentBookingId: null } },
+        { new: true }
+      ).lean();
+      if (released) socketHandler.emitCabStatus(released);
       allocationResult = await runAllocationCycle();
+      socketHandler.emitAllocationCompleted(allocationResult);
     }
+
+    socketHandler.emitBookingUpdated(booking.toObject());
+    await socketHandler.broadcastQueueSnapshot();
 
     return res.status(200).json({
       booking: booking.toObject(),
@@ -227,12 +243,15 @@ async function startTrip(req, res, next) {
     await booking.save();
 
     if (booking.vehicleId) {
-      await Vehicle.updateOne(
+      const veh = await Vehicle.findOneAndUpdate(
         { vehicleId: booking.vehicleId },
-        { $set: { status: 'on_trip' } }
-      );
+        { $set: { status: 'on_trip' } },
+        { new: true }
+      ).lean();
+      if (veh) socketHandler.emitCabStatus(veh);
     }
 
+    socketHandler.emitBookingUpdated(booking.toObject());
     return res.status(200).json({ booking: booking.toObject() });
   } catch (err) {
     return next(err);

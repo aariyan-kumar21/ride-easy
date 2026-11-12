@@ -2,6 +2,7 @@ const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
 const { runAllocationCycle } = require('../services/allocation.service');
 const { removeVehicleTrack } = require('../services/simulation.service');
+const socketHandler = require('../sockets/socket.handler');
 
 const ALLOWED_STATUSES = ['available', 'assigned', 'to_pickup', 'on_trip', 'offline'];
 
@@ -62,9 +63,15 @@ async function updateVehicleStatus(req, res, next) {
       allocationResult = await runAllocationCycle();
     }
 
-    const refreshedVehicle = await Vehicle.findOne({ vehicleId: id }).lean();
+    const refreshedVehicle = (await Vehicle.findOne({ vehicleId: id }).lean()) || vehicle.toObject();
+    socketHandler.emitCabStatus(refreshedVehicle);
+    if (allocationResult) {
+      socketHandler.emitAllocationCompleted(allocationResult);
+      await socketHandler.broadcastQueueSnapshot();
+    }
+
     return res.status(200).json({
-      vehicle: refreshedVehicle || vehicle.toObject(),
+      vehicle: refreshedVehicle,
       allocation: allocationResult
     });
   } catch (err) {
