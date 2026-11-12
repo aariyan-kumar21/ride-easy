@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const { sortRequestsByPriority } = require('../services/priority.service');
+const { runAllocationCycle } = require('../services/allocation.service');
 
 async function getQueue(req, res, next) {
   try {
@@ -85,5 +86,14 @@ async function getAdminStats(req, res, next) {
   }
 }
 
-module.exports = { getQueue, getAdminStats };
+async function triggerAllocation(req, res, next) {
+  try {
+    const result = await runAllocationCycle();
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getQueue, getAdminStats, triggerAllocation };
 

@@ -1,5 +1,6 @@
 const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
+const { runAllocationCycle } = require('../services/allocation.service');
 
 const ALLOWED_STATUSES = ['available', 'assigned', 'to_pickup', 'on_trip', 'offline'];
 
@@ -54,7 +55,16 @@ async function updateVehicleStatus(req, res, next) {
     vehicle.status = status;
     await vehicle.save();
 
-    return res.status(200).json({ vehicle: vehicle.toObject() });
+    let allocationResult = null;
+    if (status === 'available') {
+      allocationResult = await runAllocationCycle();
+    }
+
+    const refreshedVehicle = await Vehicle.findOne({ vehicleId: id }).lean();
+    return res.status(200).json({
+      vehicle: refreshedVehicle || vehicle.toObject(),
+      allocation: allocationResult
+    });
   } catch (err) {
     return next(err);
   }

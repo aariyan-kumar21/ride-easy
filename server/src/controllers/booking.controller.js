@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const { calculatePriority } = require('../services/priority.service');
+const { runAllocationCycle } = require('../services/allocation.service');
 
 const VALID_VEHICLE_TYPES = ['cab', 'auto'];
 const VALID_CATEGORIES = ['senior', 'woman', 'regular'];
@@ -139,7 +140,13 @@ async function createBooking(req, res, next) {
       priorityBreakdown
     });
 
-    return res.status(201).json({ booking: booking.toObject() });
+    const allocationResult = await runAllocationCycle();
+    const updatedBooking = await Booking.findOne({ bookingId: booking.bookingId }).lean();
+
+    return res.status(201).json({
+      booking: updatedBooking || booking.toObject(),
+      allocation: allocationResult
+    });
   } catch (err) {
     return next(err);
   }
@@ -169,14 +176,19 @@ async function cancelBooking(req, res, next) {
     booking.vehicleId = null;
     await booking.save();
 
+    let allocationResult = null;
     if (assignedVehicleId) {
       await Vehicle.updateOne(
         { vehicleId: assignedVehicleId, currentBookingId: booking.bookingId },
         { $set: { status: 'available', currentBookingId: null } }
       );
+      allocationResult = await runAllocationCycle();
     }
 
-    return res.status(200).json({ booking: booking.toObject() });
+    return res.status(200).json({
+      booking: booking.toObject(),
+      allocation: allocationResult
+    });
   } catch (err) {
     return next(err);
   }
