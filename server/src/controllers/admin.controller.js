@@ -1,15 +1,15 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
+const { sortRequestsByPriority } = require('../services/priority.service');
 
 async function getQueue(req, res, next) {
   try {
-    const queuedBookings = await Booking.find({ status: 'queued' })
-      .sort({ priorityScore: -1, createdAt: 1, bookingId: 1 })
-      .lean();
+    const now = new Date();
+    const queuedBookings = await Booking.find({ status: 'queued' }).lean();
+    const sortedQueue = sortRequestsByPriority(queuedBookings, { now, recalculate: true });
 
-    const now = Date.now();
-    const queue = queuedBookings.map((item, index) => ({
+    const queue = sortedQueue.map((item, index) => ({
       position: index + 1,
       bookingId: item.bookingId,
       userId: item.userId,
@@ -20,7 +20,7 @@ async function getQueue(req, res, next) {
       destination: item.destination,
       priorityScore: item.priorityScore,
       priorityBreakdown: item.priorityBreakdown,
-      waitMinutes: Math.max(0, Math.floor((now - new Date(item.createdAt).getTime()) / 60000)),
+      waitMinutes: Math.max(0, Math.floor((now.getTime() - new Date(item.createdAt).getTime()) / 60000)),
       createdAt: item.createdAt
     }));
 

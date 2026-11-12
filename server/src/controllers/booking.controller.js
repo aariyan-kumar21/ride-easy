@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
+const { calculatePriority } = require('../services/priority.service');
 
 const VALID_VEHICLE_TYPES = ['cab', 'auto'];
 const VALID_CATEGORIES = ['senior', 'woman', 'regular'];
@@ -110,6 +111,11 @@ async function createBooking(req, res, next) {
     }
 
     const bookingId = `BK-${Date.now().toString().slice(-5)}${Math.floor(Math.random() * 90 + 10)}`;
+    const now = new Date();
+    const { priorityScore, priorityBreakdown } = calculatePriority(
+      { category: normalizedCategory, createdAt: now },
+      { now }
+    );
 
     const booking = await Booking.create({
       bookingId,
@@ -129,13 +135,8 @@ async function createBooking(req, res, next) {
       passengerCount: count,
       vehicleType: normalizedType,
       status: 'requested',
-      priorityScore: 0,
-      priorityBreakdown: {
-        categoryBonus: 0,
-        waitingTimeBonus: 0,
-        isNightHours: false,
-        reason: 'Pending priority allocation'
-      }
+      priorityScore,
+      priorityBreakdown
     });
 
     return res.status(201).json({ booking: booking.toObject() });
