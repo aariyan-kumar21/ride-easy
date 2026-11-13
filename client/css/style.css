@@ -964,7 +964,8 @@ button {
   height: 34px;
 }
 
-.map-icon-btn i {
+.map-icon-btn i,
+.map-icon-btn svg {
   width: 16px;
   height: 16px;
 }
@@ -977,7 +978,8 @@ button {
   color: var(--text-secondary);
 }
 
-.map-filter-btn i {
+.map-filter-btn i,
+.map-filter-btn svg {
   width: 14px;
   height: 14px;
 }
@@ -1892,4 +1894,428 @@ button {
   margin-bottom: 0.35rem;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.25rem;
+}
+
+/* ==========================================================================
+   VEHICLE MAP PIN & CUSTOM ASSET ICONS
+   ========================================================================== */
+.urban-vehicle-marker {
+  background: transparent;
+  border: none;
+  transition: transform 0.45s linear;
+}
+
+.vehicle-map-pin {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(23, 22, 47, 0.16);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+}
+
+.vehicle-map-pin:hover {
+  transform: scale(1.18);
+  box-shadow: 0 6px 18px rgba(137, 84, 246, 0.3);
+  z-index: 1000 !important;
+}
+
+.vehicle-map-pin.veh-ring-avail {
+  border: 2px solid var(--green);
+  box-shadow: 0 3px 10px rgba(22, 184, 90, 0.28);
+}
+
+.vehicle-map-pin.veh-ring-assigned {
+  border: 2.5px solid var(--primary-purple);
+  box-shadow: 0 4px 14px rgba(137, 84, 246, 0.35);
+  animation: pulse-ring 2s infinite;
+}
+
+.vehicle-map-pin.veh-ring-ontrip {
+  border: 2.5px solid var(--blue);
+  box-shadow: 0 4px 14px rgba(49, 136, 245, 0.35);
+}
+
+.vehicle-icon-img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.popup-vehicle-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.popup-veh-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   REDESIGNED BOOKING REQUEST CARDS (Left Column)
+   ========================================================================== */
+.booking-request-card {
+  background-color: #FFFFFF;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.8rem 0.9rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 2px 8px rgba(23, 22, 47, 0.03);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.booking-request-card:hover {
+  border-color: var(--primary-purple);
+  box-shadow: 0 6px 18px rgba(137, 84, 246, 0.08);
+  transform: translateY(-1px);
+}
+
+.booking-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.booking-user-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.user-avatar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.booking-names-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.booking-pax-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.booking-pax-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.booking-cat-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  background-color: #FFFFFF;
+}
+
+.booking-count-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: var(--bg-app);
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+}
+
+.booking-top-right {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.booking-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.65rem;
+  background-color: var(--bg-app);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.55rem;
+}
+
+.booking-location-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.loc-label-bold {
+  font-weight: 700;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  width: 44px;
+}
+
+.loc-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-top: 0.25rem;
+}
+
+.booking-veh-assigned {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.booking-veh-icon-small {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.booking-ref-id {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   REDESIGNED ACTIVE RIDES CARDS (Right Column)
+   ========================================================================== */
+.active-ride-card {
+  background-color: #FFFFFF;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 4px 14px rgba(23, 22, 47, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.active-ride-card:hover {
+  border-color: var(--primary-purple);
+  box-shadow: 0 6px 20px rgba(137, 84, 246, 0.09);
+  transform: translateY(-1px);
+}
+
+.ride-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.ride-passenger-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.category-indicator-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ride-pax-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ride-category-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  background-color: #FFFFFF;
+}
+
+.ride-lifecycle-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.ride-lifecycle-badge.badge-assigned {
+  background-color: var(--light-purple);
+  color: var(--primary-purple);
+}
+
+.ride-lifecycle-badge.badge-pickedup {
+  background-color: var(--green-light);
+  color: var(--green);
+}
+
+.ride-lifecycle-badge.badge-waiting {
+  background-color: var(--orange-light);
+  color: var(--orange);
+}
+
+.ride-veh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+  padding: 0.4rem 0.6rem;
+  background-color: var(--bg-app);
+  border-radius: var(--radius-sm);
+}
+
+.ride-veh-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ride-veh-thumb {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.ride-veh-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ride-eta-box {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 11.5px;
+}
+
+.ride-eta-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.ride-eta-val {
+  color: var(--primary-purple);
+  font-weight: 700;
+}
+
+.ride-eta-val.queue-highlight {
+  color: var(--orange);
+}
+
+.ride-route-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin-bottom: 0.65rem;
+  padding-left: 0.2rem;
+}
+
+.route-line-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 12px;
+}
+
+.route-point-marker {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.route-point-marker.pickup-dot {
+  background-color: var(--green);
+}
+
+.route-point-marker.dest-dot {
+  background-color: var(--pink);
+}
+
+.route-point-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  width: 42px;
+  flex-shrink: 0;
+}
+
+.route-point-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ride-card-progress-wrap {
+  width: 100%;
+  height: 4px;
+  background-color: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ride-card-progress-fill {
+  height: 100%;
+  transition: width 0.4s ease;
+  border-radius: 2px;
+}
+
+.ride-card-progress-fill.progress-assigned {
+  background-color: var(--primary-purple);
+}
+
+.ride-card-progress-fill.progress-pickedup {
+  background-color: var(--green);
+}
+
+.ride-card-progress-fill.progress-waiting {
+  background-color: var(--orange);
 }

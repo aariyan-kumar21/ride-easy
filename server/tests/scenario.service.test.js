@@ -124,9 +124,9 @@ describe('Predefined Demo Scenarios', () => {
       skipDbClear: true
     });
 
-    // 6-pax booking must get C102 (6 seats); 5-pax booking must be queued since only one 6-seat cab exists
+    // 6-pax booking must get Cab2 (6 seats); 5-pax booking must be queued since only one 6-seat cab exists
     const sixPax = res.allocation.allocated.find((a) => a.bookingId === 'SC4-BK-01');
-    assert.equal(sixPax.vehicleId, 'C102');
+    assert.equal(sixPax.vehicleId, 'Cab2');
     assert.equal(sixPax.capacity, 6);
     assert.ok(res.allocation.queued.some((q) => q.bookingId === 'SC4-BK-02'));
   });

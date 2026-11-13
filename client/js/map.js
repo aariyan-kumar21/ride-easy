@@ -13,23 +13,26 @@ const vehicleMarkers = new Map();
 const passengerMarkers = new Map();
 const destinationMarkers = new Map();
 const routeLayers = new Map();
+const vehicleHeadings = new Map(); // vehicleId -> 'left' | 'right'
 
 /**
- * Color palette matching the design specification:
- * - Purple: #8954F6 for U1
- * - Pink:   #F52D91 for U2
- * - Orange: #FF9415 for U3
- * - Blue:   #3188F5 for U4
- * - Green:  #16B85A for U5
+ * Category-based color mapping:
+ * - Women: Pink (#F52D91)
+ * - Regular: Blue (#3188F5)
+ * - Senior citizens: Yellow (#F4B928)
  */
-export function getPassengerColor(userId) {
-  const str = String(userId || '');
-  if (str.includes('101') || str.endsWith('1')) return '#8954F6'; // Purple (U1)
-  if (str.includes('102') || str.endsWith('2')) return '#F52D91'; // Pink (U2)
-  if (str.includes('103') || str.endsWith('3')) return '#FF9415'; // Orange (U3)
-  if (str.includes('104') || str.endsWith('4')) return '#3188F5'; // Blue (U4)
-  if (str.includes('105') || str.endsWith('5')) return '#16B85A'; // Green (U5)
-  return '#8954F6';
+export function getCategoryColor(category) {
+  const cat = String(category || '').toLowerCase();
+  if (cat.includes('woman') || cat.includes('women')) return '#F52D91';
+  if (cat.includes('senior')) return '#F4B928';
+  return '#3188F5';
+}
+
+export function getPassengerColor(categoryOrBooking) {
+  if (typeof categoryOrBooking === 'object' && categoryOrBooking !== null) {
+    return getCategoryColor(categoryOrBooking.rawCategory || categoryOrBooking.category);
+  }
+  return getCategoryColor(categoryOrBooking);
 }
 
 export function getShortPassengerId(userId) {
@@ -42,66 +45,73 @@ export function getShortPassengerId(userId) {
 
 /**
  * Custom Vehicle Leaflet Marker Icon
- * - Car icon for Cabs, Auto-rickshaw icon for Autos.
- * - Available vehicles have a clean green-accented icon on white.
- * - Assigned/moving vehicles have a visible colored icon.
- * - Vehicle ID is displayed in popup/tooltip, not as text on the marker.
+ * - Uses exact custom attached assets:
+ *   - Cab: /assets/cab-icon.png (Yellow car)
+ *   - Auto: /assets/auto-icon.png (Green & Yellow auto-rickshaw)
+ * - Vehicle icon moves along OSRM route.
+ * - Flips horizontally based on heading (East vs West) without distortion.
  */
 function createVehicleIcon(vehicle) {
   const isAuto = String(vehicle.vehicleType).toLowerCase() === 'auto';
-  const isAvailable = vehicle.status === 'available';
+  const iconSrc = isAuto ? '/assets/auto-icon.png' : '/assets/cab-icon.png';
+  const heading = vehicleHeadings.get(vehicle.id) || 'left';
+  // Default images face left. If moving East (right), flip horizontally:
+  const flipStyle = heading === 'right' ? 'transform: scaleX(-1);' : '';
+
   const isAssigned = vehicle.status === 'assigned' || vehicle.status === 'to_pickup';
   const isOnTrip = vehicle.status === 'on_trip';
 
-  const iconSvg = isAuto
-    ? `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`
-    : `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>`;
-
-  let markerClass = 'veh-avail';
-  if (isAssigned) markerClass = 'veh-assigned';
-  else if (isOnTrip) markerClass = 'veh-ontrip';
+  let ringClass = 'veh-ring-avail';
+  if (isAssigned) ringClass = 'veh-ring-assigned';
+  else if (isOnTrip) ringClass = 'veh-ring-ontrip';
 
   return L.divIcon({
     className: 'urban-vehicle-marker',
     html: `
-      <div class="vehicle-map-icon ${markerClass}" title="${vehicle.id} &middot; ${vehicle.vehicleType} (${vehicle.status})">
-        ${iconSvg}
+      <div class="vehicle-map-pin ${ringClass}" title="${vehicle.id} &middot; ${vehicle.vehicleType} (${vehicle.status})">
+        <img src="${iconSrc}" class="vehicle-icon-img" style="${flipStyle}" alt="${vehicle.id}" />
       </div>
     `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18]
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+    popupAnchor: [0, -21]
   });
 }
 
 function createVehiclePopupHtml(vehicle) {
   const isAuto = String(vehicle.vehicleType).toLowerCase() === 'auto';
+  const iconSrc = isAuto ? '/assets/auto-icon.png' : '/assets/cab-icon.png';
   return `
     <div class="map-popup">
-      <div class="popup-clean-title">${vehicle.id} &middot; ${isAuto ? 'Auto' : 'Cab'}</div>
-      <div><strong>Status:</strong> ${vehicle.status.replace('_', ' ')}</div>
-      <div><strong>Capacity:</strong> ${vehicle.capacity} passengers</div>
-      ${vehicle.currentBookingId ? `<div><strong>Assigned Booking:</strong> ${vehicle.currentBookingId}</div>` : ''}
-      ${vehicle.area ? `<div><strong>Zone:</strong> ${vehicle.area}</div>` : ''}
+      <div class="popup-vehicle-header">
+        <img src="${iconSrc}" class="popup-veh-img" alt="${vehicle.id}" />
+        <div>
+          <div class="popup-clean-title" style="margin:0;">${vehicle.id} &middot; ${isAuto ? 'Auto' : 'Cab'}</div>
+          <span class="status-pill-badge ${vehicle.status}" style="font-size:10px; padding:2px 6px;">${vehicle.status.replace('_', ' ')}</span>
+        </div>
+      </div>
+      <div style="margin-top:0.4rem;"><strong>Capacity:</strong> ${vehicle.capacity} seats</div>
+      ${vehicle.currentBookingId ? `<div><strong>Assigned Ride:</strong> ${vehicle.currentBookingId}</div>` : ''}
+      ${vehicle.area ? `<div><strong>Location:</strong> ${vehicle.area}</div>` : ''}
     </div>
   `;
 }
 
 /**
  * Custom Passenger Leaflet Marker Icon
- * - Clean person/user SVG icon inside a circular marker.
- * - Distinct colored background per booking.
- * - No prominent ID text on top of the marker.
- * - Passenger ID available in popup on click.
+ * - Clean white person/user SVG icon inside circular badge with category-based background.
+ * - Women: Pink (#F52D91)
+ * - Regular: Blue (#3188F5)
+ * - Senior: Yellow (#F4B928)
  */
 function createPassengerIcon(passenger) {
-  const pId = passenger.id || passenger.userId;
-  const color = getPassengerColor(pId);
+  const color = getCategoryColor(passenger.rawCategory || passenger.category);
+  const pName = passenger.passengerName || passenger.userId || 'Passenger';
 
   return L.divIcon({
     className: 'urban-passenger-marker',
     html: `
-      <div class="passenger-map-badge" style="background-color: ${color};" title="Passenger (Click for details)">
+      <div class="passenger-map-badge" style="background-color: ${color};" title="${pName} (${passenger.category})">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
@@ -109,17 +119,17 @@ function createPassengerIcon(passenger) {
       </div>
     `,
     iconSize: [34, 34],
-    iconAnchor: [17, 34],
-    popupAnchor: [0, -34]
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -17]
   });
 }
 
 function createDestinationIcon(passenger) {
-  const pId = passenger.id || passenger.userId;
+  const color = getCategoryColor(passenger.rawCategory || passenger.category);
   return L.divIcon({
     className: 'urban-passenger-marker',
     html: `
-      <div class="destination-map-badge" title="Destination for ${pId}">
+      <div class="destination-map-badge" style="border-color:${color}; color:${color};" title="Destination for ${passenger.passengerName || passenger.userId}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
           <line x1="4" y1="22" x2="4" y2="15"/>
@@ -133,25 +143,35 @@ function createDestinationIcon(passenger) {
 }
 
 function createPassengerPopupHtml(passenger) {
-  const pId = passenger.id || passenger.userId;
+  const color = getCategoryColor(passenger.rawCategory || passenger.category);
+  const pName = passenger.passengerName || passenger.userId || 'Passenger';
   return `
     <div class="map-popup">
-      <div class="popup-clean-title">Passenger &middot; ${pId}</div>
+      <div class="popup-clean-title" style="display:flex; align-items:center; gap:0.4rem;">
+        <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background-color:${color};"></span>
+        <span>${pName}</span>
+      </div>
       <div><strong>Category:</strong> ${passenger.category || 'Regular'}</div>
-      <div><strong>Pickup:</strong> ${passenger.pickup?.label || 'Pickup point'}</div>
-      <div><strong>Destination:</strong> ${passenger.destination?.label || 'Destination'}</div>
+      <div><strong>Pickup:</strong> ${passenger.pickupLabel || passenger.pickup?.label || 'Pickup Location'}</div>
+      <div><strong>Destination:</strong> ${passenger.destinationLabel || passenger.destination?.label || 'Destination'}</div>
       <div><strong>Passengers:</strong> ${passenger.passengerCount || 1}</div>
+      ${passenger.vehicle && passenger.vehicle !== 'Pending' ? `<div><strong>Assigned Vehicle:</strong> ${passenger.vehicle}</div>` : ''}
+      <div style="font-size:10px; color:var(--text-muted); margin-top:0.35rem;">Booking Ref: ${passenger.bookingId || passenger.id}</div>
     </div>
   `;
 }
 
 function createDestinationPopupHtml(passenger) {
-  const pId = passenger.id || passenger.userId;
+  const color = getCategoryColor(passenger.rawCategory || passenger.category);
+  const pName = passenger.passengerName || passenger.userId || 'Passenger';
   return `
     <div class="map-popup">
-      <div class="popup-clean-title">Destination &middot; ${pId}</div>
-      <div>${passenger.destination?.label || 'Destination Point'}</div>
-      <div><strong>Passenger:</strong> ${passenger.category || 'Regular'}</div>
+      <div class="popup-clean-title" style="display:flex; align-items:center; gap:0.4rem; color:${color};">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg>
+        <span>Destination &middot; ${pName}</span>
+      </div>
+      <div>${passenger.destinationLabel || passenger.destination?.label || 'Destination Point'}</div>
+      <div><strong>Passenger:</strong> ${pName} (${passenger.category || 'Regular'})</div>
     </div>
   `;
 }
@@ -177,6 +197,16 @@ export function updateVehicleMarker(vehicle) {
     return addVehicleMarker(vehicle);
   }
 
+  const prevLatLng = existing.getLatLng();
+  if (prevLatLng && vehicle.lng != null) {
+    const dLng = vehicle.lng - prevLatLng.lng;
+    if (dLng > 0.00004) {
+      vehicleHeadings.set(vehicle.id, 'right');
+    } else if (dLng < -0.00004) {
+      vehicleHeadings.set(vehicle.id, 'left');
+    }
+  }
+
   existing.setLatLng([vehicle.lat, vehicle.lng]);
   existing.setIcon(createVehicleIcon(vehicle));
   existing.setPopupContent(createVehiclePopupHtml(vehicle));
@@ -188,12 +218,13 @@ export function removeVehicleMarker(vehicleId) {
   if (!existing || !vehicleLayer) return false;
   vehicleLayer.removeLayer(existing);
   vehicleMarkers.delete(vehicleId);
+  vehicleHeadings.delete(vehicleId);
   return true;
 }
 
 export function addPassengerMarker(passenger) {
   if (!passengerLayer) return null;
-  const pId = passenger.id || passenger.userId;
+  const pId = passenger.id || passenger.bookingId || passenger.userId;
   if (passengerMarkers.has(pId)) {
     return updatePassengerMarker(passenger);
   }
@@ -218,18 +249,20 @@ export function addPassengerMarker(passenger) {
 }
 
 export function updatePassengerMarker(passenger) {
-  const pId = passenger.id || passenger.userId;
+  const pId = passenger.id || passenger.bookingId || passenger.userId;
   const existing = passengerMarkers.get(pId);
   if (!existing) {
     return addPassengerMarker(passenger);
   }
 
   existing.setLatLng([passenger.lat, passenger.lng]);
+  existing.setIcon(createPassengerIcon(passenger));
   existing.setPopupContent(createPassengerPopupHtml(passenger));
 
   const existingDest = destinationMarkers.get(pId);
   if (existingDest && passenger.destination) {
     existingDest.setLatLng([passenger.destination.lat, passenger.destination.lng]);
+    existingDest.setIcon(createDestinationIcon(passenger));
     existingDest.setPopupContent(createDestinationPopupHtml(passenger));
   }
   return existing;
@@ -346,7 +379,7 @@ export function upsertBookingRoute(booking) {
 
   removeBookingRoute(booking.id);
 
-  const routeColor = getPassengerColor(booking.userId);
+  const routeColor = getPassengerColor(booking.rawCategory || booking.category);
   const isPending = booking.status === 'requested' || booking.status === 'queued';
   const isTrip = booking.status === 'on_trip';
 
@@ -359,10 +392,11 @@ export function upsertBookingRoute(booking) {
 
   const etaText = booking.estimatedPickupMinutes ? `${booking.estimatedPickupMinutes} min` : '—';
   const estSuffix = booking.isEstimatedRoute ? ' (est.)' : '';
+  const pName = booking.passengerName || booking.userId || 'Passenger';
 
   const popupHtml = `
     <div class="map-popup">
-      <div class="popup-clean-title">${booking.id} &middot; Passenger ${booking.userId}</div>
+      <div class="popup-clean-title" style="color:${routeColor};">${pName} &middot; Route</div>
       <div><strong>Status:</strong> ${booking.status.replace('_', ' ')}</div>
       <div><strong>Vehicle:</strong> ${booking.vehicle || 'Matching...'}</div>
       <div><strong>ETA:</strong> ${etaText}${estSuffix}</div>
@@ -399,30 +433,85 @@ function syncAllMarkersFromState() {
   vehicles.forEach(updateVehicleMarker);
   applyVehicleFilter();
 
-  // 2. Only show passenger markers for active bookings
-  const activeUserIds = new Set();
-  bookings.forEach((b) => {
-    if (['requested', 'queued', 'assigned', 'to_pickup', 'on_trip'].includes(b.status)) {
-      if (Array.isArray(b.pickup)) {
-        activeUserIds.add(b.userId);
-        addPassengerMarker({
-          id: b.userId,
-          userId: b.userId,
-          category: b.category,
-          passengerCount: b.passengerCount,
-          lat: b.pickup[0],
-          lng: b.pickup[1],
-          pickup: { label: b.pickupLabel, lat: b.pickup[0], lng: b.pickup[1] },
-          destination: b.destination ? { label: b.destinationLabel, lat: b.destination[0], lng: b.destination[1] } : null
-        });
+  // 2. Active bookings that require passenger markers
+  const activeBookings = bookings.filter(
+    (b) =>
+      ['requested', 'queued', 'assigned', 'to_pickup', 'on_trip'].includes(b.status) &&
+      Array.isArray(b.pickup) &&
+      b.pickup.length >= 2
+  );
+
+  const activeBookingIds = new Set(activeBookings.map((b) => b.id));
+
+  // Group active bookings by pickup location proximity (~35 meters / 0.00035 deg)
+  const clusters = [];
+  activeBookings.forEach((b) => {
+    const lat = b.pickup[0];
+    const lng = b.pickup[1];
+    let found = null;
+    for (const c of clusters) {
+      const dLat = Math.abs(lat - c.center[0]);
+      const dLng = Math.abs(lng - c.center[1]);
+      if (dLat < 0.00035 && dLng < 0.00035) {
+        found = c;
+        break;
       }
+    }
+    if (found) {
+      found.bookings.push(b);
+    } else {
+      clusters.push({ center: [lat, lng], bookings: [b] });
     }
   });
 
+  // Distribute markers in each cluster with controlled geographic offset
+  clusters.forEach((cluster) => {
+    const N = cluster.bookings.length;
+    const centerLat = cluster.center[0];
+    const centerLng = cluster.center[1];
+
+    cluster.bookings.forEach((b, index) => {
+      let displayLat = centerLat;
+      let displayLng = centerLng;
+
+      if (N > 1) {
+        // Small radial offset (~22 meters) so every passenger marker is distinctly visible and clickable
+        const angle = (2 * Math.PI * index) / N;
+        const radiusLat = 0.00020;
+        const radiusLng = 0.00020 / Math.cos((centerLat * Math.PI) / 180);
+        displayLat = centerLat + radiusLat * Math.sin(angle);
+        displayLng = centerLng + radiusLng * Math.cos(angle);
+      }
+
+      addPassengerMarker({
+        id: b.id,
+        bookingId: b.id,
+        userId: b.userId,
+        passengerName: b.passengerName,
+        category: b.category,
+        rawCategory: b.rawCategory,
+        passengerCount: b.passengerCount,
+        vehicle: b.vehicle,
+        lat: displayLat,
+        lng: displayLng,
+        realPickup: b.pickup,
+        pickupLabel: b.pickupLabel,
+        destination: b.destination
+          ? {
+              lat: b.destination[0],
+              lng: b.destination[1],
+              label: b.destinationLabel
+            }
+          : null,
+        destinationLabel: b.destinationLabel
+      });
+    });
+  });
+
   // Clean up passenger markers for bookings that completed or cancelled
-  passengerMarkers.forEach((_marker, userId) => {
-    if (!activeUserIds.has(userId)) {
-      removePassengerMarker(userId);
+  passengerMarkers.forEach((_marker, bId) => {
+    if (!activeBookingIds.has(bId)) {
+      removePassengerMarker(bId);
     }
   });
 
@@ -447,6 +536,7 @@ export function initMap() {
   // Standard OpenStreetMap street tiles (No API key required)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
+    subdomains: ['a', 'b', 'c'],
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(mapInstance);
 
@@ -464,26 +554,11 @@ export function initMap() {
       updateVehicleMarker(payload);
       applyVehicleFilter();
     } else if ((changeType === 'booking:added' || changeType === 'booking:updated') && payload) {
-      if (payload.status === 'completed' || payload.status === 'cancelled') {
-        removeBookingRoute(payload.id);
-        removePassengerMarker(payload.userId);
-      } else {
-        upsertBookingRoute(payload);
-        if (Array.isArray(payload.pickup)) {
-          addPassengerMarker({
-            id: payload.userId,
-            userId: payload.userId,
-            category: payload.category,
-            passengerCount: payload.passengerCount,
-            lat: payload.pickup[0],
-            lng: payload.pickup[1],
-            pickup: { label: payload.pickupLabel, lat: payload.pickup[0], lng: payload.pickup[1] },
-            destination: payload.destination ? { label: payload.destinationLabel, lat: payload.destination[0], lng: payload.destination[1] } : null
-          });
-        }
+      syncAllMarkersFromState();
+      if (payload.vehicle && payload.vehicle !== 'Pending') {
+        const vehicle = state.vehicles.find((v) => v.id === payload.vehicle);
+        if (vehicle) updateVehicleMarker(vehicle);
       }
-      const vehicle = state.vehicles.find((v) => v.id === payload.vehicle);
-      if (vehicle) updateVehicleMarker(vehicle);
     } else if (changeType === 'filter:changed') {
       applyVehicleFilter();
     } else if (changeType === 'state:reset' || changeType === 'simulation:cleared') {

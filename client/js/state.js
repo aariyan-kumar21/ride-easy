@@ -4,6 +4,18 @@ import { notifyBookingPickup, notifyBookingCompleted, resetToastTracking } from 
 
 const listeners = new Set();
 
+const INDIAN_NAME_POOLS = {
+  regular: ['Aarav Sharma', 'Arjun Verma', 'Rohan Mehta', 'Aditya Kumar', 'Rahul Singh', 'Karan Malhotra', 'Vihaan Gupta'],
+  woman: ['Ananya Sharma', 'Priya Mehta', 'Aditi Verma', 'Kavya Singh', 'Isha Kapoor', 'Riya Malhotra', 'Meera Nair'],
+  senior: ['Rajesh Khanna', 'Suresh Menon', 'Meenakshi Iyer', 'Sunita Sharma', 'Prakash Rao', 'Kamala Devi', 'Shanti Verma']
+};
+
+export function getRandomIndianName(category) {
+  const norm = String(category || 'regular').toLowerCase();
+  const pool = INDIAN_NAME_POOLS[norm] || INDIAN_NAME_POOLS.regular;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 const CATEGORY_LABELS = {
   senior: 'Senior Citizen',
   woman: 'Woman',
@@ -24,10 +36,16 @@ function mapVehicle(v) {
 }
 
 function mapBooking(b) {
+  const normCat = String(b.category || 'regular').toLowerCase();
+  const rawPickupLabel = b.pickup?.label || (typeof b.pickup === 'string' ? b.pickup : '');
+  const rawDestLabel = b.destination?.label || (typeof b.destination === 'string' ? b.destination : '');
+
   return {
     id: b.bookingId || b.id,
     userId: b.userId,
-    category: CATEGORY_LABELS[b.category] || b.category || 'Regular',
+    passengerName: b.passengerName || b.name || getRandomIndianName(normCat),
+    category: CATEGORY_LABELS[normCat] || b.category || 'Regular',
+    rawCategory: normCat,
     vehicle: b.vehicleId || 'Pending',
     status: b.status,
     estPickup:
@@ -36,10 +54,11 @@ function mapBooking(b) {
         : b.status === 'completed'
         ? 'Done'
         : '—',
-    pickup: b.pickup ? [b.pickup.lat, b.pickup.lng] : null,
-    destination: b.destination ? [b.destination.lat, b.destination.lng] : null,
-    destinationLabel: b.destination?.label || '',
-    passengerCount: b.passengerCount,
+    pickup: b.pickup ? [b.pickup.lat ?? b.pickup[0], b.pickup.lng ?? b.pickup[1]] : null,
+    pickupLabel: rawPickupLabel || 'Pickup Location',
+    destination: b.destination ? [b.destination.lat ?? b.destination[0], b.destination.lng ?? b.destination[1]] : null,
+    destinationLabel: rawDestLabel || 'Destination',
+    passengerCount: b.passengerCount || 1,
     vehicleType: b.vehicleType,
     priorityScore: b.priorityScore || 0,
     priorityBreakdown: b.priorityBreakdown || null,
@@ -52,14 +71,21 @@ function mapBooking(b) {
 }
 
 function mapQueueItem(q) {
+  const normCat = String(q.category || 'regular').toLowerCase();
   return {
     id: q.bookingId || q.id,
     userId: q.userId,
+    passengerName: q.passengerName || getRandomIndianName(normCat),
     priorityScore: q.priorityScore ?? 0,
     waitMinutes: q.waitMinutes ?? 0,
-    category: CATEGORY_LABELS[q.category] || q.category || 'Regular',
+    category: CATEGORY_LABELS[normCat] || q.category || 'Regular',
+    rawCategory: normCat,
     priorityReason: q.priorityBreakdown?.reason || '',
-    pickup: q.pickup ? [q.pickup.lat, q.pickup.lng] : null
+    pickup: q.pickup ? [q.pickup.lat ?? q.pickup[0], q.pickup.lng ?? q.pickup[1]] : null,
+    pickupLabel: q.pickup?.label || (typeof q.pickup === 'string' ? q.pickup : 'Pickup Point'),
+    destinationLabel: q.destination?.label || (typeof q.destination === 'string' ? q.destination : 'Destination'),
+    vehicleType: q.vehicleType || 'cab',
+    passengerCount: q.passengerCount || 1
   };
 }
 

@@ -108,35 +108,62 @@ function renderActiveBookingRequests() {
     return;
   }
 
-  const cancellable = new Set(['requested', 'queued', 'assigned']);
+  const cancellable = new Set(['requested', 'queued', 'assigned', 'to_pickup']);
 
   container.innerHTML = activeBookings
     .map((b) => {
-      const pColor = getPassengerColor(b.userId);
-      const shortId = getShortPassengerId(b.userId);
-      const pickupText = b.pickupLabel || (b.pickup ? 'Pickup' : 'Origin');
-      const destText = b.destinationLabel || (b.destination ? 'Drop' : 'Destination');
+      const pColor = getPassengerColor(b.rawCategory || b.category);
+      const isAuto = String(b.vehicleType).toLowerCase() === 'auto';
+      const vehIconSrc = isAuto ? '/assets/auto-icon.png' : '/assets/cab-icon.png';
+      const pickupText = b.pickupLabel || 'Pickup location';
+      const destText = b.destinationLabel || 'Destination';
+      const hasVehicle = b.vehicle && b.vehicle !== 'Pending';
+      const vehDisplay = hasVehicle ? b.vehicle : 'Matching vehicle...';
       const canStart = b.status === 'assigned' || b.status === 'to_pickup';
       const canCancel = cancellable.has(b.status);
 
       return `
-        <div class="booking-request-item" data-booking-id="${b.id}" title="Click to focus on map">
-          <div class="req-left-info">
-            <div class="user-avatar-circle" style="background-color: ${pColor};">
-              ${shortId}
-            </div>
-            <div class="req-locations">
-              <div class="req-title-row">
-                <span class="req-user-id">${b.id}</span>
-                <span class="req-pax-count">(${b.passengerCount}p &middot; ${b.category})</span>
+        <div class="booking-request-card" data-booking-id="${b.id}" title="Click to view on map">
+          <div class="booking-card-top-row">
+            <div class="booking-user-header">
+              <div class="user-avatar-circle" style="background-color: ${pColor};">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
               </div>
-              <span class="req-path-text">${pickupText} &rarr; ${destText}</span>
+              <div class="booking-names-col">
+                <strong class="booking-pax-name">${b.passengerName}</strong>
+                <div class="booking-pax-tags">
+                  <span class="booking-cat-badge" style="color:${pColor}; border-color:${pColor};">${b.category}</span>
+                  <span class="booking-count-badge">${b.passengerCount} ${b.passengerCount > 1 ? 'Passengers' : 'Passenger'}</span>
+                </div>
+              </div>
+            </div>
+            <div class="booking-top-right">
+              <span class="status-pill-badge ${b.status}">${b.status.replace('_', ' ')}</span>
+              ${canStart ? `<button type="button" class="action-menu-btn" data-start-id="${b.id}" title="Start Trip" style="color:var(--primary-purple);"><i data-lucide="play"></i></button>` : ''}
+              ${canCancel ? `<button type="button" class="action-menu-btn" data-cancel-id="${b.id}" title="Cancel Booking" style="color:var(--pink);"><i data-lucide="x"></i></button>` : ''}
             </div>
           </div>
-          <div class="req-right-actions">
-            <span class="status-pill-badge ${b.status}">${b.status.replace('_', ' ')}</span>
-            ${canStart ? `<button type="button" class="action-menu-btn" data-start-id="${b.id}" title="Start Trip" style="color:var(--primary-purple);"><i data-lucide="play"></i></button>` : ''}
-            ${canCancel ? `<button type="button" class="action-menu-btn" data-cancel-id="${b.id}" title="Cancel Booking" style="color:var(--pink);"><i data-lucide="x"></i></button>` : ''}
+
+          <div class="booking-card-body">
+            <div class="booking-location-row">
+              <span class="loc-label-bold">Pickup:</span>
+              <span class="loc-value">${pickupText}</span>
+            </div>
+            <div class="booking-location-row">
+              <span class="loc-label-bold">Drop:</span>
+              <span class="loc-value">${destText}</span>
+            </div>
+          </div>
+
+          <div class="booking-card-footer">
+            <div class="booking-veh-assigned">
+              <img src="${vehIconSrc}" class="booking-veh-icon-small" alt="${b.vehicleType}" />
+              <span>Assigned: <strong>${vehDisplay}</strong></span>
+            </div>
+            <span class="booking-ref-id">Ref: ${b.id}</span>
           </div>
         </div>
       `;
@@ -148,13 +175,13 @@ function renderActiveBookingRequests() {
   }
 
   // Row click to focus on map
-  container.querySelectorAll('.booking-request-item').forEach((row) => {
+  container.querySelectorAll('.booking-request-card').forEach((row) => {
     row.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
       const booking = getState().bookings.find((b) => b.id === row.dataset.bookingId);
       if (!booking) return;
       const [lat, lng] = Array.isArray(booking.pickup) ? booking.pickup : [];
-      focusPickupOnMap({ lat, lng, passengerId: booking.userId });
+      focusPickupOnMap({ lat, lng, passengerId: booking.id });
     });
   });
 
@@ -189,6 +216,11 @@ function renderActiveBookingRequests() {
 
 /**
  * Render Right Column Card B: Active Rides (Live)
+ * Follows exact ride lifecycle states:
+ * STATE A: CAB ASSIGNED / AUTO ASSIGNED (travelling to pickup)
+ * STATE B: PASSENGER PICKED UP (travelling to destination)
+ * STATE C: Completed rides removed
+ * STATE D: WAITING FOR CAB / WAITING FOR AUTO
  */
 function renderActiveRidesLive() {
   const container = document.getElementById('active-rides-live-list');
@@ -196,7 +228,7 @@ function renderActiveRidesLive() {
   if (!container) return;
   const { bookings } = getState();
 
-  // Active rides are assigned, to_pickup, on_trip, or queued
+  // Active rides are assigned, to_pickup, on_trip, or queued (completed/cancelled are excluded)
   const activeRides = bookings.filter((b) => ['assigned', 'to_pickup', 'on_trip', 'queued'].includes(b.status));
 
   if (countBadge) {
@@ -204,48 +236,102 @@ function renderActiveRidesLive() {
   }
 
   if (activeRides.length === 0) {
-    container.innerHTML = '<div class="muted-text" style="padding:1rem;text-align:center;font-size:12px;">No active rides currently on road.</div>';
+    container.innerHTML = '<div class="muted-text" style="padding:1.25rem;text-align:center;font-size:12px;">No active rides currently on road.</div>';
     return;
   }
 
   container.innerHTML = activeRides
     .map((b) => {
-      const pColor = getPassengerColor(b.userId);
-      const shortId = getShortPassengerId(b.userId);
-      const isAssigned = b.vehicle && b.vehicle !== 'Pending';
-      const vehText = isAssigned ? b.vehicle : 'Matching...';
-      const etaText = b.estimatedPickupMinutes != null ? `${b.estimatedPickupMinutes} min ETA` : (isAssigned ? 'En route' : 'In Queue');
+      const pColor = getPassengerColor(b.rawCategory || b.category);
+      const isAuto = String(b.vehicleType).toLowerCase() === 'auto';
+      const vehIconSrc = isAuto ? '/assets/auto-icon.png' : '/assets/cab-icon.png';
+      const hasVehicle = Boolean(b.vehicle && b.vehicle !== 'Pending');
+      const vehName = hasVehicle ? b.vehicle : (isAuto ? 'Auto' : 'Cab');
 
-      // Progress percentage
-      let progressPercent = 30;
-      let isMatching = false;
-      if (b.status === 'on_trip') progressPercent = 75;
-      else if (b.status === 'to_pickup' || b.status === 'assigned') progressPercent = 40;
-      else {
+      const isPickedUp = b.status === 'on_trip';
+      const isAssigned = (b.status === 'assigned' || b.status === 'to_pickup') && hasVehicle;
+
+      let statusBadgeHtml = '';
+      let etaBadgeHtml = '';
+      let progressPercent = 20;
+      let progressClass = 'progress-assigned';
+
+      if (isPickedUp) {
+        // STATE B: PASSENGER PICKED UP / ON THE WAY
+        statusBadgeHtml = `<span class="ride-lifecycle-badge badge-pickedup">PASSENGER PICKED UP</span>`;
+        const destEta = b.estimatedPickupMinutes != null ? b.estimatedPickupMinutes : 10;
+        etaBadgeHtml = `
+          <div class="ride-eta-box">
+            <span class="ride-eta-label">ETA to destination:</span>
+            <strong class="ride-eta-val">${destEta} minutes</strong>
+          </div>
+        `;
+        progressPercent = 75;
+        progressClass = 'progress-pickedup';
+      } else if (isAssigned) {
+        // STATE A: CAB ASSIGNED / AUTO ASSIGNED (TRAVELLING TO PICKUP)
+        const badgeText = isAuto ? 'AUTO ASSIGNED' : 'CAB ASSIGNED';
+        statusBadgeHtml = `<span class="ride-lifecycle-badge badge-assigned">${badgeText}</span>`;
+        const pickupEta = b.estimatedPickupMinutes != null ? b.estimatedPickupMinutes : 4;
+        etaBadgeHtml = `
+          <div class="ride-eta-box">
+            <span class="ride-eta-label">Arriving at pickup:</span>
+            <strong class="ride-eta-val">${pickupEta} minutes</strong>
+          </div>
+        `;
+        progressPercent = 35;
+        progressClass = 'progress-assigned';
+      } else {
+        // STATE D: WAITING FOR ALLOCATION
+        const waitText = isAuto ? 'WAITING FOR AUTO' : 'WAITING FOR CAB';
+        statusBadgeHtml = `<span class="ride-lifecycle-badge badge-waiting">${waitText}</span>`;
+        etaBadgeHtml = `
+          <div class="ride-eta-box">
+            <span class="ride-eta-label">Status:</span>
+            <strong class="ride-eta-val queue-highlight">In Priority Queue</strong>
+          </div>
+        `;
         progressPercent = 100;
-        isMatching = true;
+        progressClass = 'progress-waiting';
       }
 
+      const pickupName = b.pickupLabel || 'Pickup Location';
+      const destName = b.destinationLabel || 'Destination';
+
       return `
-        <div class="live-ride-item" data-booking-id="${b.id}" title="Click to view ride on map">
-          <div class="ride-header-row">
-            <div class="ride-user-meta">
-              <div class="user-avatar-circle" style="background-color: ${pColor}; width:28px; height:28px; font-size:11px;">
-                ${shortId}
-              </div>
-              <span class="ride-id-text">${b.id}</span>
-              <span class="ride-veh-badge">${vehText}</span>
+        <div class="active-ride-card" data-booking-id="${b.id}" title="Click to view ride on map">
+          <div class="ride-card-top">
+            <div class="ride-passenger-row">
+              <span class="category-indicator-dot" style="background-color: ${pColor};"></span>
+              <strong class="ride-pax-name">${b.passengerName}</strong>
+              <span class="ride-category-pill" style="border-color:${pColor}; color:${pColor};">${b.category}</span>
             </div>
-            <span class="ride-eta-badge">${etaText}</span>
+            ${statusBadgeHtml}
           </div>
 
-          <div class="ride-progress-bar-wrap">
-            <div class="ride-progress-fill ${isMatching ? 'matching' : ''}" style="width: ${progressPercent}%;"></div>
+          <div class="ride-veh-row">
+            <div class="ride-veh-chip">
+              <img src="${vehIconSrc}" class="ride-veh-thumb" alt="${vehName}" />
+              <span class="ride-veh-name">${hasVehicle ? vehName : (isAuto ? 'Auto Requested' : 'Cab Requested')}</span>
+            </div>
+            ${etaBadgeHtml}
           </div>
 
-          <div class="ride-footer-row">
-            <span>${b.status.replace('_', ' ')}</span>
-            <span class="ride-focus-arrow"><i data-lucide="arrow-right"></i></span>
+          <div class="ride-route-details">
+            <div class="route-line-item">
+              <span class="route-point-marker pickup-dot"></span>
+              <span class="route-point-label">Pickup:</span>
+              <strong class="route-point-name">${pickupName}</strong>
+            </div>
+            <div class="route-line-item">
+              <span class="route-point-marker dest-dot"></span>
+              <span class="route-point-label">Drop:</span>
+              <strong class="route-point-name">${destName}</strong>
+            </div>
+          </div>
+
+          <div class="ride-card-progress-wrap">
+            <div class="ride-card-progress-fill ${progressClass}" style="width: ${progressPercent}%;"></div>
           </div>
         </div>
       `;
@@ -256,15 +342,14 @@ function renderActiveRidesLive() {
     lucide.createIcons({ root: container });
   }
 
-  container.querySelectorAll('.live-ride-item').forEach((row) => {
+  container.querySelectorAll('.active-ride-card').forEach((row) => {
     row.addEventListener('click', () => {
       const booking = getState().bookings.find((b) => b.id === row.dataset.bookingId);
       if (!booking) return;
       if (booking.vehicle && booking.vehicle !== 'Pending') {
         focusVehicleOnMap(booking.vehicle);
-      } else {
-        const [lat, lng] = Array.isArray(booking.pickup) ? booking.pickup : [];
-        focusPickupOnMap({ lat, lng, passengerId: booking.userId });
+      } else if (Array.isArray(booking.pickup)) {
+        focusPickupOnMap({ lat: booking.pickup[0], lng: booking.pickup[1], passengerId: booking.id });
       }
     });
   });

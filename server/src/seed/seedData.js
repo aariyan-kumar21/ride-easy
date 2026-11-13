@@ -6,7 +6,7 @@ const Booking = require('../models/Booking');
 const SEED_USERS = [
   {
     userId: 'U101',
-    name: 'Lakshmi Narayan',
+    name: 'Rajesh Khanna',
     category: 'senior',
     passengerCount: 1,
     defaultPickup: { lat: 12.9742, lng: 77.6012, label: 'Cubbon Park Metro' },
@@ -14,7 +14,7 @@ const SEED_USERS = [
   },
   {
     userId: 'U102',
-    name: 'Ananya Rao',
+    name: 'Ananya Sharma',
     category: 'woman',
     passengerCount: 2,
     defaultPickup: { lat: 12.9389, lng: 77.6211, label: 'Koramangala 4th Block' },
@@ -22,7 +22,7 @@ const SEED_USERS = [
   },
   {
     userId: 'U103',
-    name: 'Karthik Shetty',
+    name: 'Aarav Sharma',
     category: 'regular',
     passengerCount: 4,
     defaultPickup: { lat: 12.9767, lng: 77.5713, label: 'Majestic Bus Station' },
@@ -30,7 +30,7 @@ const SEED_USERS = [
   },
   {
     userId: 'U104',
-    name: 'Raghavendra Iyer',
+    name: 'Suresh Menon',
     category: 'senior',
     passengerCount: 1,
     defaultPickup: { lat: 12.9982, lng: 77.5685, label: 'Malleshwaram 8th Cross' },
@@ -38,8 +38,8 @@ const SEED_USERS = [
   },
   {
     userId: 'U105',
-    name: 'Meera Nair',
-    category: 'regular',
+    name: 'Priya Mehta',
+    category: 'woman',
     passengerCount: 2,
     defaultPickup: { lat: 12.9304, lng: 77.583, label: 'Jayanagar 4th Block' },
     defaultDestination: { lat: 12.966, lng: 77.5998, label: 'Richmond Circle' }
@@ -47,24 +47,23 @@ const SEED_USERS = [
 ];
 
 const SEED_VEHICLES = [
-  { vehicleId: 'C101', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9756, longitude: 77.6066, area: 'MG Road', currentBookingId: null },
-  { vehicleId: 'C102', vehicleType: 'cab', capacity: 6, status: 'on_trip', latitude: 12.9784, longitude: 77.6408, area: 'Indiranagar', currentBookingId: 'BK-1044' },
-  { vehicleId: 'C103', vehicleType: 'cab', capacity: 4, status: 'assigned', latitude: 12.9352, longitude: 77.6245, area: 'Koramangala', currentBookingId: 'BK-1045' },
-  { vehicleId: 'C104', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9611, longitude: 77.5855, area: 'Lalbagh', currentBookingId: null },
-  { vehicleId: 'C105', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9915, longitude: 77.5712, area: 'Malleshwaram', currentBookingId: null },
-  { vehicleId: 'C106', vehicleType: 'auto', capacity: 3, status: 'on_trip', latitude: 12.9279, longitude: 77.5838, area: 'Jayanagar', currentBookingId: 'BK-1043' },
-  { vehicleId: 'C107', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.985, longitude: 77.5533, area: 'Rajajinagar', currentBookingId: null },
-  { vehicleId: 'C108', vehicleType: 'auto', capacity: 3, status: 'assigned', latitude: 12.9592, longitude: 77.6476, area: 'Domlur', currentBookingId: null },
-  { vehicleId: 'C109', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 13.0098, longitude: 77.5511, area: 'Yeshwanthpur', currentBookingId: null },
-  { vehicleId: 'C110', vehicleType: 'cab', capacity: 4, status: 'on_trip', latitude: 12.9668, longitude: 77.6194, area: 'Ulsoor', currentBookingId: null }
+  { vehicleId: 'Cab1', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9756, longitude: 77.6066, area: 'MG Road', currentBookingId: null },
+  { vehicleId: 'Cab2', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 12.9784, longitude: 77.6408, area: 'Indiranagar', currentBookingId: null },
+  { vehicleId: 'Cab3', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9352, longitude: 77.6245, area: 'Koramangala', currentBookingId: null },
+  { vehicleId: 'Cab4', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9611, longitude: 77.5855, area: 'Lalbagh', currentBookingId: null },
+  { vehicleId: 'Cab5', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 12.9915, longitude: 77.5712, area: 'Malleshwaram', currentBookingId: null },
+  { vehicleId: 'Auto1', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9716, longitude: 77.5946, area: 'Cubbon Park', currentBookingId: null },
+  { vehicleId: 'Auto2', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9389, longitude: 77.6211, area: 'Koramangala 4th Block', currentBookingId: null },
+  { vehicleId: 'Auto3', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9767, longitude: 77.5713, area: 'Majestic', currentBookingId: null }
 ];
 
 const SEED_BOOKINGS = [
   {
     bookingId: 'BK-1045',
     userId: 'U101',
+    passengerName: 'Rajesh Khanna',
     category: 'senior',
-    vehicleId: 'C103',
+    vehicleId: 'Cab3',
     pickup: { lat: 12.9742, lng: 77.6012, label: 'Cubbon Park Metro' },
     destination: { lat: 12.9585, lng: 77.6488, label: 'Manipal Hospital, HAL' },
     passengerCount: 1,
@@ -78,8 +77,9 @@ const SEED_BOOKINGS = [
   {
     bookingId: 'BK-1044',
     userId: 'U102',
+    passengerName: 'Ananya Sharma',
     category: 'woman',
-    vehicleId: 'C102',
+    vehicleId: 'Cab2',
     pickup: { lat: 12.9389, lng: 77.6211, label: 'Koramangala 4th Block' },
     destination: { lat: 12.9752, lng: 77.6045, label: 'MG Road Boulevard' },
     passengerCount: 2,
@@ -93,8 +93,9 @@ const SEED_BOOKINGS = [
   {
     bookingId: 'BK-1043',
     userId: 'U103',
+    passengerName: 'Aarav Sharma',
     category: 'regular',
-    vehicleId: 'C106',
+    vehicleId: 'Auto2',
     pickup: { lat: 12.9767, lng: 77.5713, label: 'Majestic Bus Station' },
     destination: { lat: 12.9784, lng: 77.6408, label: 'Indiranagar 100ft Rd' },
     passengerCount: 2,
@@ -108,6 +109,7 @@ const SEED_BOOKINGS = [
   {
     bookingId: 'BK-1042',
     userId: 'U104',
+    passengerName: 'Suresh Menon',
     category: 'senior',
     vehicleId: null,
     pickup: { lat: 12.9982, lng: 77.5685, label: 'Malleshwaram 8th Cross' },
@@ -123,8 +125,9 @@ const SEED_BOOKINGS = [
   {
     bookingId: 'BK-1041',
     userId: 'U105',
+    passengerName: 'Priya Mehta',
     category: 'regular',
-    vehicleId: 'C101',
+    vehicleId: 'Cab1',
     pickup: { lat: 12.9304, lng: 77.583, label: 'Jayanagar 4th Block' },
     destination: { lat: 12.966, lng: 77.5998, label: 'Richmond Circle' },
     passengerCount: 2,

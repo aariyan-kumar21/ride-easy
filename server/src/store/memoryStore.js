@@ -6,7 +6,7 @@
 const INITIAL_USERS = [
   {
     userId: 'U101',
-    name: 'Lakshmi Narayan',
+    name: 'Rajesh Khanna',
     category: 'senior',
     passengerCount: 1,
     defaultPickup: { lat: 12.9742, lng: 77.6012, label: 'Cubbon Park Metro' },
@@ -15,7 +15,7 @@ const INITIAL_USERS = [
   },
   {
     userId: 'U102',
-    name: 'Ananya Rao',
+    name: 'Ananya Sharma',
     category: 'woman',
     passengerCount: 2,
     defaultPickup: { lat: 12.9389, lng: 77.6211, label: 'Koramangala 4th Block' },
@@ -24,7 +24,7 @@ const INITIAL_USERS = [
   },
   {
     userId: 'U103',
-    name: 'Karthik Shetty',
+    name: 'Aarav Sharma',
     category: 'regular',
     passengerCount: 4,
     defaultPickup: { lat: 12.9767, lng: 77.5713, label: 'Majestic Bus Station' },
@@ -33,7 +33,7 @@ const INITIAL_USERS = [
   },
   {
     userId: 'U104',
-    name: 'Raghavendra Iyer',
+    name: 'Suresh Menon',
     category: 'senior',
     passengerCount: 1,
     defaultPickup: { lat: 12.9982, lng: 77.5685, label: 'Malleshwaram 8th Cross' },
@@ -42,8 +42,8 @@ const INITIAL_USERS = [
   },
   {
     userId: 'U105',
-    name: 'Meera Nair',
-    category: 'regular',
+    name: 'Priya Mehta',
+    category: 'woman',
     passengerCount: 2,
     defaultPickup: { lat: 12.9304, lng: 77.583, label: 'Jayanagar 4th Block' },
     defaultDestination: { lat: 12.966, lng: 77.5998, label: 'Richmond Circle' },
@@ -52,11 +52,14 @@ const INITIAL_USERS = [
 ];
 
 const INITIAL_VEHICLES = [
-  { vehicleId: 'C101', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9756, longitude: 77.6066, area: 'MG Road', currentBookingId: null },
-  { vehicleId: 'C102', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 12.9784, longitude: 77.6408, area: 'Indiranagar', currentBookingId: null },
-  { vehicleId: 'C103', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9352, longitude: 77.6245, area: 'Koramangala', currentBookingId: null },
-  { vehicleId: 'C104', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9611, longitude: 77.5855, area: 'Lalbagh', currentBookingId: null },
-  { vehicleId: 'C105', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 12.9915, longitude: 77.5712, area: 'Malleshwaram', currentBookingId: null }
+  { vehicleId: 'Cab1', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9756, longitude: 77.6066, area: 'MG Road', currentBookingId: null },
+  { vehicleId: 'Cab2', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 12.9784, longitude: 77.6408, area: 'Indiranagar', currentBookingId: null },
+  { vehicleId: 'Cab3', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9352, longitude: 77.6245, area: 'Koramangala', currentBookingId: null },
+  { vehicleId: 'Cab4', vehicleType: 'cab', capacity: 4, status: 'available', latitude: 12.9611, longitude: 77.5855, area: 'Lalbagh', currentBookingId: null },
+  { vehicleId: 'Cab5', vehicleType: 'cab', capacity: 6, status: 'available', latitude: 12.9915, longitude: 77.5712, area: 'Malleshwaram', currentBookingId: null },
+  { vehicleId: 'Auto1', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9716, longitude: 77.5946, area: 'Cubbon Park', currentBookingId: null },
+  { vehicleId: 'Auto2', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9389, longitude: 77.6211, area: 'Koramangala 4th Block', currentBookingId: null },
+  { vehicleId: 'Auto3', vehicleType: 'auto', capacity: 3, status: 'available', latitude: 12.9767, longitude: 77.5713, area: 'Majestic', currentBookingId: null }
 ];
 
 const INITIAL_BOOKINGS = [];

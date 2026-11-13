@@ -52,9 +52,30 @@ const LOCATIONS = {
   ulsoor: { lat: 12.9668, lng: 77.6194, label: 'Ulsoor Lake' }
 };
 
+const INDIAN_NAME_POOLS = {
+  regular: ['Aarav Sharma', 'Arjun Verma', 'Rohan Mehta', 'Aditya Kumar', 'Rahul Singh', 'Karan Malhotra', 'Vihaan Gupta'],
+  woman: ['Ananya Sharma', 'Priya Mehta', 'Aditi Verma', 'Kavya Singh', 'Isha Kapoor', 'Riya Malhotra', 'Meera Nair'],
+  senior: ['Rajesh Khanna', 'Suresh Menon', 'Meenakshi Iyer', 'Sunita Sharma', 'Prakash Rao', 'Kamala Devi', 'Shanti Verma']
+};
+
+function getRandomIndianName(category) {
+  const norm = String(category || 'regular').toLowerCase();
+  const pool = INDIAN_NAME_POOLS[norm] || INDIAN_NAME_POOLS.regular;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+const SCENARIO_NAMES = {
+  'U101': 'Rajesh Khanna',
+  'U102': 'Ananya Sharma',
+  'U103': 'Aarav Sharma',
+  'U104': 'Suresh Menon',
+  'U105': 'Priya Mehta'
+};
+
 function buildBookingDoc({
   bookingId,
   userId,
+  passengerName,
   category,
   vehicleType,
   passengerCount,
@@ -70,6 +91,7 @@ function buildBookingDoc({
   return {
     bookingId,
     userId,
+    passengerName: passengerName || SCENARIO_NAMES[userId] || getRandomIndianName(category),
     category,
     vehicleType,
     passengerCount,
@@ -89,7 +111,7 @@ function getScenarioBlueprint(scenarioId) {
       const simTime = new Date(2026, 10, 12, 14, 0, 0);
       const vehicles = SEED_VEHICLES.map((v) => ({
         ...v,
-        status: v.vehicleId === 'C110' ? 'offline' : 'available',
+        status: 'available',
         currentBookingId: null
       }));
       const bookings = [
@@ -104,8 +126,8 @@ function getScenarioBlueprint(scenarioId) {
 
     case 'peak_hour': {
       const simTime = new Date(2026, 10, 12, 18, 15, 0);
-      // Only 4 available vehicles (C101, C102, C104, C105); rest busy/offline
-      const availableIds = new Set(['C101', 'C102', 'C104', 'C105']);
+      // 4 available vehicles (Cab1, Cab2, Auto1, Auto2); rest busy/offline
+      const availableIds = new Set(['Cab1', 'Cab2', 'Auto1', 'Auto2']);
       const vehicles = SEED_VEHICLES.map((v) => ({
         ...v,
         status: availableIds.has(v.vehicleId) ? 'available' : 'offline',
@@ -128,7 +150,7 @@ function getScenarioBlueprint(scenarioId) {
 
     case 'night_priority': {
       const simTime = new Date(2026, 10, 12, 22, 30, 0); // 10:30 PM
-      const availableIds = new Set(['C101', 'C103', 'C104']);
+      const availableIds = new Set(['Cab1', 'Cab3', 'Auto1']);
       const vehicles = SEED_VEHICLES.map((v) => ({
         ...v,
         status: availableIds.has(v.vehicleId) ? 'available' : 'offline',
@@ -147,8 +169,8 @@ function getScenarioBlueprint(scenarioId) {
 
     case 'group_booking': {
       const simTime = new Date(2026, 10, 12, 15, 0, 0);
-      // Only one 6-seat XL cab (C102), two 4-seat cabs (C101, C103), and two 3-seat autos (C104, C105)
-      const availableIds = new Set(['C101', 'C102', 'C103', 'C104', 'C105']);
+      // Cab2 has 6 seats, Cab1 & Cab3 have 4 seats, Auto1 & Auto2 have 3 seats
+      const availableIds = new Set(['Cab1', 'Cab2', 'Cab3', 'Auto1', 'Auto2']);
       const vehicles = SEED_VEHICLES.map((v) => ({
         ...v,
         status: availableIds.has(v.vehicleId) ? 'available' : 'offline',
@@ -166,8 +188,8 @@ function getScenarioBlueprint(scenarioId) {
 
     case 'vehicle_cancellation': {
       const simTime = new Date(2026, 10, 12, 16, 0, 0);
-      // C101 is closest to MG Road, C103 is backup cab
-      const availableIds = new Set(['C101', 'C103', 'C104']);
+      // Cab1 is closest to MG Road, Cab3 is backup cab
+      const availableIds = new Set(['Cab1', 'Cab3', 'Auto1']);
       const vehicles = SEED_VEHICLES.map((v) => ({
         ...v,
         status: availableIds.has(v.vehicleId) ? 'available' : 'offline',

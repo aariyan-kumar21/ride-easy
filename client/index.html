@@ -13,13 +13,8 @@
     rel="stylesheet"
   />
 
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
+  <!-- Leaflet CSS (Local bundle with fallback) -->
+  <link rel="stylesheet" href="./vendor/leaflet.css" />
 
   <!-- App Stylesheets -->
   <link rel="stylesheet" href="./css/style.css" />
@@ -316,14 +311,14 @@
               </div>
             </article>
 
-            <!-- 2. Total Cabs (Pink) -->
+            <!-- 2. Total Vehicles (Pink) -->
             <article class="stat-box pink">
               <div class="stat-icon-wrap pink">
                 <i data-lucide="car"></i>
               </div>
               <div class="stat-data">
-                <span id="stat-total-cabs" class="stat-number">10</span>
-                <span class="stat-label">Total Cabs</span>
+                <span id="stat-total-cabs" class="stat-number">8</span>
+                <span class="stat-label">Total Vehicles</span>
               </div>
             </article>
 
@@ -466,7 +461,7 @@
       <!-- FLEET TABLE -->
       <div id="drawer-fleet-section">
         <div class="drawer-subheading">
-          <strong>Vehicle Fleet (10 Units)</strong>
+          <strong>Vehicle Fleet (8 Units)</strong>
           <span class="muted-text">Change status or click to focus</span>
         </div>
         <div class="table-container">
@@ -507,13 +502,26 @@
     </div>
   </div>
 
-  <!-- Leaflet JS & Lucide Icons -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Local Protocol Warning Guard -->
+  <script>
+    if (window.location.protocol === 'file:') {
+      window.addEventListener('DOMContentLoaded', () => {
+        const warn = document.createElement('div');
+        warn.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#F52D91;color:#fff;font-weight:700;text-align:center;padding:12px;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+        warn.innerHTML = '⚠️ You are viewing this via file:// protocol. Browsers restrict scripts & modules on local files. Please open <a href="http://localhost:5000" style="color:#fff;text-decoration:underline;">http://localhost:5000</a> in your browser!';
+        document.body.prepend(warn);
+      });
+    }
+  </script>
+
+  <!-- Leaflet JS & Lucide Icons (Local bundles for fast & offline reliability) -->
+  <script src="./vendor/leaflet.js"></script>
+  <script src="./vendor/lucide.min.js"></script>
+  <script>
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons(); } catch (e) {}
+    }
+  </script>
 
   <!-- Socket.IO Client -->
   <script src="/socket.io/socket.io.js"></script>

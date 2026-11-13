@@ -7,6 +7,18 @@ const { getRouteEstimate } = require('../services/routing.service');
 const { removeVehicleTrack } = require('../services/simulation.service');
 const socketHandler = require('../sockets/socket.handler');
 
+const INDIAN_NAME_POOLS = {
+  regular: ['Aarav Sharma', 'Arjun Verma', 'Rohan Mehta', 'Aditya Kumar', 'Rahul Singh', 'Karan Malhotra', 'Vihaan Gupta'],
+  woman: ['Ananya Sharma', 'Priya Mehta', 'Aditi Verma', 'Kavya Singh', 'Isha Kapoor', 'Riya Malhotra', 'Meera Nair'],
+  senior: ['Rajesh Khanna', 'Suresh Menon', 'Meenakshi Iyer', 'Sunita Sharma', 'Prakash Rao', 'Kamala Devi', 'Shanti Verma']
+};
+
+function getRandomIndianName(category) {
+  const norm = String(category || 'regular').toLowerCase();
+  const pool = INDIAN_NAME_POOLS[norm] || INDIAN_NAME_POOLS.regular;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 const VALID_VEHICLE_TYPES = ['cab', 'auto'];
 const VALID_CATEGORIES = ['senior', 'woman', 'regular'];
 const CANCELLABLE_STATUSES = ['requested', 'queued', 'assigned'];
@@ -63,6 +75,7 @@ async function createBooking(req, res, next) {
   try {
     const {
       userId,
+      passengerName,
       category = 'regular',
       pickup,
       destination,
@@ -110,6 +123,9 @@ async function createBooking(req, res, next) {
     }
 
     const resolvedUserId = userId ? String(userId).trim() : `U-${Date.now().toString().slice(-4)}`;
+    const resolvedPassengerName =
+      (passengerName && String(passengerName).trim()) || getRandomIndianName(normalizedCategory);
+
     if (userId) {
       await User.findOne({ userId: resolvedUserId }).lean();
     }
@@ -124,6 +140,7 @@ async function createBooking(req, res, next) {
     const booking = await Booking.create({
       bookingId,
       userId: resolvedUserId,
+      passengerName: resolvedPassengerName,
       category: normalizedCategory,
       vehicleId: null,
       pickup: {

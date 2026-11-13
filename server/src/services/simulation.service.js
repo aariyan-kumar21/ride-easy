@@ -143,7 +143,8 @@ async function syncActiveTracks(options = {}) {
       bookingId: booking.bookingId,
       phase: booking.status === 'on_trip' ? 'on_trip' : 'to_pickup',
       profile: buildRouteProfile(route),
-      distanceTraveled: 0
+      distanceTraveled: 0,
+      initialDurationMinutes: booking.estimatedPickupMinutes || 5
     });
   }
 }
@@ -190,6 +191,20 @@ async function stepSimulation(options = {}) {
       });
     }
 
+    // Update remaining ETA minutes dynamically
+    if (track.profile.totalDistance > 0) {
+      const fractionRemaining = Math.max(0, 1 - (track.distanceTraveled / track.profile.totalDistance));
+      const initialMin = track.initialDurationMinutes || booking.estimatedPickupMinutes || 5;
+      const updatedMin = Math.max(1, Math.round(initialMin * fractionRemaining));
+      if (booking.estimatedPickupMinutes !== updatedMin) {
+        booking.estimatedPickupMinutes = updatedMin;
+        await BookingModel.updateOne(
+          { bookingId: booking.bookingId },
+          { $set: { estimatedPickupMinutes: updatedMin } }
+        );
+      }
+    }
+
     // Check if vehicle reached end of current route
     if (track.distanceTraveled >= track.profile.totalDistance) {
       if (track.phase === 'to_pickup') {
@@ -227,6 +242,7 @@ async function stepSimulation(options = {}) {
         track.phase = 'on_trip';
         track.profile = buildRouteProfile(tripRoute.geometry);
         track.distanceTraveled = 0;
+        track.initialDurationMinutes = tripRoute.durationMinutes;
 
         const emitter = getSocketEmitter();
         if (emitter) {
