@@ -444,6 +444,59 @@
             </div>
           </div>
         </section>
+
+        <!-- CARD D: SIMULATION TIME & TRAFFIC CONDITIONS -->
+        <section class="card time-traffic-card" id="time-traffic-card">
+          <div class="card-header-clean">
+            <div class="title-with-pill">
+              <h2 class="card-heading">Simulation Time &amp; Traffic Conditions</h2>
+              <span id="active-time-cat-pill" class="time-cat-pill daytime">Normal Daytime</span>
+            </div>
+          </div>
+
+          <div class="time-traffic-body">
+            <!-- Active Condition Banner -->
+            <div id="traffic-condition-banner" class="traffic-condition-box">
+              <div class="traffic-cond-left">
+                <i data-lucide="sun" id="traffic-cond-icon" class="traffic-cond-icon"></i>
+                <div class="traffic-cond-text">
+                  <strong id="traffic-cond-title">Normal Daytime (11:00–15:59)</strong>
+                  <span id="traffic-cond-desc">Senior Citizen (+40) receives highest priority. Standard daytime rules apply.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Predefined Presets Grid -->
+            <div class="time-presets-section">
+              <label class="time-subheading">Predefined Time Presets</label>
+              <div class="time-presets-grid" role="radiogroup" aria-label="Simulation Time Presets">
+                <button type="button" class="time-preset-btn" data-time="06:00" data-cat="early_morning">06:00 AM &middot; Early Morning</button>
+                <button type="button" class="time-preset-btn" data-time="08:00" data-cat="morning_peak">08:00 AM &middot; Morning</button>
+                <button type="button" class="time-preset-btn" data-time="11:00" data-cat="normal_daytime">11:00 AM &middot; Late Morning</button>
+                <button type="button" class="time-preset-btn active" data-time="14:00" data-cat="normal_daytime">02:00 PM &middot; Afternoon</button>
+                <button type="button" class="time-preset-btn" data-time="17:00" data-cat="evening_peak">05:00 PM &middot; Evening Peak</button>
+                <button type="button" class="time-preset-btn" data-time="19:00" data-cat="evening">07:00 PM &middot; Evening</button>
+                <button type="button" class="time-preset-btn" data-time="22:00" data-cat="night">10:00 PM &middot; Night</button>
+                <button type="button" class="time-preset-btn" data-time="00:00" data-cat="night">12:00 AM &middot; Late Night</button>
+              </div>
+            </div>
+
+            <!-- Custom Time Selector & Apply Button -->
+            <div class="custom-time-section">
+              <div class="custom-time-row">
+                <div class="custom-time-input-wrap">
+                  <label for="custom-time-picker" class="custom-time-label">Custom Time</label>
+                  <input type="time" id="custom-time-picker" class="custom-time-input" value="14:00" step="60" />
+                </div>
+                <button type="button" id="apply-time-btn" class="btn-apply-time">
+                  <i data-lucide="check"></i>
+                  <span>Apply Time</span>
+                </button>
+              </div>
+              <p id="time-apply-feedback" class="time-feedback-hint"></p>
+            </div>
+          </div>
+        </section>
       </aside>
     </div>
   </main>

@@ -8,6 +8,7 @@ import {
   setSimulationStatus,
   setSimulationSpeed,
   tickSimulationClock,
+  setSimulationTime,
   runScenario,
   resetState,
   completeSimulation,
@@ -24,20 +25,127 @@ function formatClock(totalSeconds) {
   return [hrs, mins, secs].map((v) => String(v).padStart(2, '0')).join(':');
 }
 
+function getClientCategoryKey(hour, minute) {
+  const totalMins = hour * 60 + minute;
+  if (totalMins >= 5 * 60 && totalMins < 8 * 60) return 'early_morning';
+  if (totalMins >= 8 * 60 && totalMins < 11 * 60) return 'morning_peak';
+  if (totalMins >= 11 * 60 && totalMins < 16 * 60) return 'normal_daytime';
+  if (totalMins >= 16 * 60 && totalMins < 19 * 60) return 'evening_peak';
+  if (totalMins >= 19 * 60 && totalMins < 21 * 60) return 'evening';
+  return 'night';
+}
+
+function getTimeCategoryDetails(categoryKey, hour, minute) {
+  switch (categoryKey) {
+    case 'early_morning':
+      return {
+        key: 'early_morning',
+        shortTitle: 'Early Morning',
+        titleWithRange: 'Early Morning (05:00–07:59)',
+        description: 'Light traffic (0.8x delay). Senior Citizen (+40) receives highest priority.',
+        styleClass: 'daytime',
+        iconName: 'sunrise'
+      };
+    case 'morning_peak':
+      return {
+        key: 'morning_peak',
+        shortTitle: 'Morning Peak',
+        titleWithRange: 'Morning Peak (08:00–10:59)',
+        description: 'Heavy traffic (1.4x delay). High commuter rush; Senior priority active.',
+        styleClass: 'peak',
+        iconName: 'zap'
+      };
+    case 'normal_daytime':
+      return {
+        key: 'normal_daytime',
+        shortTitle: 'Normal Daytime',
+        titleWithRange: 'Normal Daytime (11:00–15:59)',
+        description: 'Moderate traffic (1.0x delay). Standard daytime FIFO within tiers; Seniors have Tier 1 priority.',
+        styleClass: 'daytime',
+        iconName: 'sun'
+      };
+    case 'evening_peak':
+      return {
+        key: 'evening_peak',
+        shortTitle: 'Evening Peak',
+        titleWithRange: 'Evening Peak (16:00–18:59)',
+        description: 'Heavy traffic (1.5x delay). Peak congestion; Senior Citizens prioritized.',
+        styleClass: 'peak',
+        iconName: 'trending-up'
+      };
+    case 'evening':
+      return {
+        key: 'evening',
+        shortTitle: 'Evening',
+        titleWithRange: 'Evening (19:00–20:59)',
+        description: 'Moderate traffic (1.1x delay). Daytime priority hierarchy in effect.',
+        styleClass: 'daytime',
+        iconName: 'sunset'
+      };
+    case 'night':
+    default:
+      return {
+        key: 'night',
+        shortTitle: 'Night Hours',
+        titleWithRange: 'Night (21:00–04:59)',
+        description: 'Light traffic (0.7x delay). Enhanced Safety: Women receive Tier 2 Night Priority (+30); Seniors Tier 1 (+40).',
+        styleClass: 'night',
+        iconName: 'moon'
+      };
+  }
+}
+
 function updateClockUI(simulation) {
   const timeEl = document.getElementById('sim-time-display');
   const periodEl = document.getElementById('sim-period-badge');
-  const hour = Math.floor(simulation.clockSeconds / 3600) % 24;
-  const isNight = hour >= 22 || hour < 6;
+  const clockSec = simulation?.clockSeconds ?? 14 * 3600;
+  const hour = Math.floor(clockSec / 3600) % 24;
+  const minute = Math.floor((clockSec % 3600) / 60);
 
-  if (timeEl) timeEl.textContent = formatClock(simulation.clockSeconds);
+  if (timeEl) timeEl.textContent = formatClock(clockSec);
+
+  // Determine time category & condition
+  const categoryKey = simulation?.simulatedTimeCategory || getClientCategoryKey(hour, minute);
+  const timeInfo = getTimeCategoryDetails(categoryKey, hour, minute);
+
   if (periodEl) {
-    periodEl.textContent = simulation.simulatedTimeLabel
-      ? `${simulation.simulatedTimeLabel}`
-      : isNight
-      ? 'Night Hours'
-      : 'Daytime';
+    periodEl.textContent = simulation?.simulatedTimeLabel || timeInfo.shortTitle;
   }
+
+  // Update Time & Traffic card
+  const activeCatPill = document.getElementById('active-time-cat-pill');
+  if (activeCatPill) {
+    activeCatPill.textContent = timeInfo.shortTitle;
+    activeCatPill.className = `time-cat-pill ${timeInfo.styleClass}`;
+  }
+
+  const condTitle = document.getElementById('traffic-cond-title');
+  if (condTitle) condTitle.textContent = timeInfo.titleWithRange;
+
+  const condDesc = document.getElementById('traffic-cond-desc');
+  if (condDesc) condDesc.textContent = timeInfo.description;
+
+  const condIcon = document.getElementById('traffic-cond-icon');
+  if (condIcon) {
+    condIcon.setAttribute('data-lucide', timeInfo.iconName);
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  }
+
+  // Sync custom time input if not focused
+  const customPicker = document.getElementById('custom-time-picker');
+  if (customPicker && document.activeElement !== customPicker) {
+    const hh = String(hour).padStart(2, '0');
+    const mm = String(minute).padStart(2, '0');
+    customPicker.value = `${hh}:${mm}`;
+  }
+
+  // Highlight active preset button if matching exactly
+  const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  document.querySelectorAll('.time-preset-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.time === timeStr);
+  });
 }
 
 function updateBanner() {
@@ -122,6 +230,13 @@ function renderActiveBookingRequests() {
       const canStart = b.status === 'assigned' || b.status === 'to_pickup';
       const canCancel = cancellable.has(b.status);
 
+      const priorityLabel = b.priorityTierLabel || (b.priorityTier === 1 ? 'Senior Citizen — Highest Priority' : (b.priorityTier === 2 ? 'Woman — Night Priority' : 'Regular — Standard Priority'));
+      const tierClass = `tier-${b.priorityTier || 3}`;
+      const isQueued = b.status === 'queued' || b.status === 'requested';
+      const queueBadge = isQueued
+        ? `<span class="queue-pos-badge">Priority #${b.queuePosition || 1} &middot; Waited ${b.waitingMinutes || 0}m</span>`
+        : '';
+
       return `
         <div class="booking-request-card" data-booking-id="${b.id}" title="Click to view on map">
           <div class="booking-card-top-row">
@@ -145,6 +260,11 @@ function renderActiveBookingRequests() {
               ${canStart ? `<button type="button" class="action-menu-btn" data-start-id="${b.id}" title="Start Trip" style="color:var(--primary-purple);"><i data-lucide="play"></i></button>` : ''}
               ${canCancel ? `<button type="button" class="action-menu-btn" data-cancel-id="${b.id}" title="Cancel Booking" style="color:var(--pink);"><i data-lucide="x"></i></button>` : ''}
             </div>
+          </div>
+
+          <div class="booking-priority-indicator ${tierClass}">
+            <span class="prio-tag">${priorityLabel}</span>
+            ${queueBadge}
           </div>
 
           <div class="booking-card-body">
@@ -285,15 +405,19 @@ function renderActiveRidesLive() {
         // STATE D: WAITING FOR ALLOCATION
         const waitText = isAuto ? 'WAITING FOR AUTO' : 'WAITING FOR CAB';
         statusBadgeHtml = `<span class="ride-lifecycle-badge badge-waiting">${waitText}</span>`;
+        const queuePos = b.queuePosition ? `Priority #${b.queuePosition}` : 'In Priority Queue';
         etaBadgeHtml = `
           <div class="ride-eta-box">
-            <span class="ride-eta-label">Status:</span>
-            <strong class="ride-eta-val queue-highlight">In Priority Queue</strong>
+            <span class="ride-eta-label">Queue:</span>
+            <strong class="ride-eta-val queue-highlight">${queuePos} &middot; ${b.waitingMinutes || 0}m wait</strong>
           </div>
         `;
         progressPercent = 100;
         progressClass = 'progress-waiting';
       }
+
+      const priorityLabel = b.priorityTierLabel || (b.priorityTier === 1 ? 'Senior Citizen — Highest Priority' : (b.priorityTier === 2 ? 'Woman — Night Priority' : 'Regular — Standard Priority'));
+      const tierClass = `tier-${b.priorityTier || 3}`;
 
       const pickupName = b.pickupLabel || 'Pickup Location';
       const destName = b.destinationLabel || 'Destination';
@@ -307,6 +431,11 @@ function renderActiveRidesLive() {
               <span class="ride-category-pill" style="border-color:${pColor}; color:${pColor};">${b.category}</span>
             </div>
             ${statusBadgeHtml}
+          </div>
+
+          <div class="ride-priority-banner ${tierClass}">
+            <span class="prio-tag">${priorityLabel}</span>
+            ${b.status === 'queued' ? `<span class="queue-pos-badge">Queue #${b.queuePosition || 1} &middot; ${b.waitingMinutes || 0}m</span>` : ''}
           </div>
 
           <div class="ride-veh-row">
@@ -616,6 +745,53 @@ export function initDashboard() {
       const speed = Number(btn.dataset.speed) || 1;
       handleSimAction(() => setSimulationSpeed(speed));
     });
+  });
+
+  // Predefined Time Presets
+  document.querySelectorAll('.time-preset-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const timeVal = btn.dataset.time;
+      if (!timeVal) return;
+      const customPicker = document.getElementById('custom-time-picker');
+      if (customPicker) customPicker.value = timeVal;
+      document.querySelectorAll('.time-preset-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const feedback = document.getElementById('time-apply-feedback');
+      if (feedback) feedback.textContent = `Applying ${btn.textContent.trim()}...`;
+
+      try {
+        await setSimulationTime({ time: timeVal });
+        if (feedback) feedback.textContent = `Time updated to ${timeVal}. Waiting queue re-evaluated.`;
+        setTimeout(() => {
+          if (feedback) feedback.textContent = '';
+        }, 3000);
+      } catch (err) {
+        if (feedback) feedback.textContent = `Error: ${err.message || 'Failed to update time'}`;
+      }
+    });
+  });
+
+  // Apply Custom Time Button
+  document.getElementById('apply-time-btn')?.addEventListener('click', async () => {
+    const customPicker = document.getElementById('custom-time-picker');
+    const timeVal = customPicker?.value || '14:00';
+    const applyBtn = document.getElementById('apply-time-btn');
+    const feedback = document.getElementById('time-apply-feedback');
+    if (applyBtn) applyBtn.disabled = true;
+    if (feedback) feedback.textContent = `Applying time ${timeVal}...`;
+
+    try {
+      await setSimulationTime({ time: timeVal });
+      if (feedback) feedback.textContent = `Time applied: ${timeVal}. Allocation rules updated.`;
+      setTimeout(() => {
+        if (feedback) feedback.textContent = '';
+      }, 3000);
+    } catch (err) {
+      if (feedback) feedback.textContent = `Error: ${err.message || 'Failed to apply time'}`;
+    } finally {
+      if (applyBtn) applyBtn.disabled = false;
+    }
   });
 
   // Scenario generator

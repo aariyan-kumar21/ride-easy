@@ -9,7 +9,8 @@ const {
   complete,
   clear,
   getScenarios,
-  generateScenario
+  generateScenario,
+  setTime
 } = require('../controllers/simulation.controller');
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.post('/start', start);
 router.post('/pause', pause);
 router.post('/resume', resume);
 router.post('/speed', setSpeed);
+router.post('/time', setTime);
 router.post('/reset', reset);
 router.post('/complete', complete);
 router.post('/clear', clear);

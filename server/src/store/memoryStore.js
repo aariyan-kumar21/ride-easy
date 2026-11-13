@@ -64,6 +64,8 @@ const INITIAL_VEHICLES = [
 
 const INITIAL_BOOKINGS = [];
 
+let bookingSequenceCounter = 0;
+
 function deepClone(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Date) return new Date(obj.getTime());
@@ -187,23 +189,32 @@ class InMemoryCollection {
 
   async create(doc) {
     const now = new Date();
+    const isBooking = doc.bookingId || this.name === 'bookings';
+    const sequenceNumber = doc.sequenceNumber ?? (isBooking ? ++bookingSequenceCounter : undefined);
+
     const newDoc = {
       _id: doc._id || `id_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       createdAt: doc.createdAt || now,
       updatedAt: doc.updatedAt || now,
-      ...deepClone(doc)
+      ...deepClone(doc),
+      ...(sequenceNumber !== undefined ? { sequenceNumber } : {})
     };
     this.data.push(newDoc);
     return wrapDocument(newDoc, this);
   }
 
   async insertMany(docs) {
-    const inserted = docs.map((d) => ({
-      _id: d._id || `id_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      createdAt: d.createdAt || new Date(),
-      updatedAt: d.updatedAt || new Date(),
-      ...deepClone(d)
-    }));
+    const inserted = docs.map((d) => {
+      const isBooking = d.bookingId || this.name === 'bookings';
+      const sequenceNumber = d.sequenceNumber ?? (isBooking ? ++bookingSequenceCounter : undefined);
+      return {
+        _id: d._id || `id_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        createdAt: d.createdAt || new Date(),
+        updatedAt: d.updatedAt || new Date(),
+        ...deepClone(d),
+        ...(sequenceNumber !== undefined ? { sequenceNumber } : {})
+      };
+    });
     this.data.push(...inserted);
     return inserted.map((d) => wrapDocument(d, this));
   }
@@ -328,6 +339,7 @@ const vehicles = new InMemoryCollection('vehicles', INITIAL_VEHICLES);
 const bookings = new InMemoryCollection('bookings', INITIAL_BOOKINGS);
 
 function resetAll() {
+  bookingSequenceCounter = 0;
   users.reset(INITIAL_USERS);
   vehicles.reset(INITIAL_VEHICLES);
   bookings.reset(INITIAL_BOOKINGS);

@@ -51,8 +51,10 @@ describe('Priority Calculation Engine', () => {
     assert.equal(resLate.priorityBreakdown.isNightHours, true);
     assert.equal(resEarly.priorityScore, 30);
     assert.equal(resEarly.priorityBreakdown.isNightHours, true);
+    assert.equal(isNightHour(new Date(2026, 10, 12, 21, 0, 0)), true);
     assert.equal(isNightHour(new Date(2026, 10, 12, 22, 0, 0)), true);
-    assert.equal(isNightHour(new Date(2026, 10, 13, 5, 59, 0)), true);
+    assert.equal(isNightHour(new Date(2026, 10, 13, 4, 59, 0)), true);
+    assert.equal(isNightHour(new Date(2026, 10, 13, 5, 0, 0)), false);
     assert.equal(isNightHour(new Date(2026, 10, 13, 6, 0, 0)), false);
   });
 

@@ -114,5 +114,28 @@ async function generateScenario(req, res, next) {
   }
 }
 
-module.exports = { getState, start, pause, resume, setSpeed, reset, complete, clear, getScenarios, generateScenario };
+async function setTime(req, res, next) {
+  try {
+    const { time, hour, minute, seconds } = req.body || {};
+    const result = await simulationService.applySimulationTime({ time, hour, minute, seconds });
+
+    socketHandler.emitSimulationState(result.simulation);
+    if (result.allocated && result.allocated.length > 0) {
+      socketHandler.emitAllocationCompleted({ allocated: result.allocated, queued: result.queued });
+    }
+    await socketHandler.broadcastQueueSnapshot();
+
+    const io = socketHandler.getIO();
+    if (io) {
+      const sockets = await io.fetchSockets();
+      await Promise.all(sockets.map((s) => socketHandler.sendFullSync(s)));
+    }
+
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getState, start, pause, resume, setSpeed, reset, complete, clear, getScenarios, generateScenario, setTime };
 

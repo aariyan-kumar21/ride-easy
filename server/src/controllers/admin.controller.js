@@ -3,11 +3,12 @@ const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const { sortRequestsByPriority } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
+const { getSimulationTime } = require('../services/simulation.service');
 const socketHandler = require('../sockets/socket.handler');
 
 async function getQueue(req, res, next) {
   try {
-    const now = new Date();
+    const now = getSimulationTime();
     const queuedBookings = await Booking.find({ status: 'queued' }).lean();
     const sortedQueue = sortRequestsByPriority(queuedBookings, { now, recalculate: true });
 
@@ -15,15 +16,20 @@ async function getQueue(req, res, next) {
       position: index + 1,
       bookingId: item.bookingId,
       userId: item.userId,
+      passengerName: item.passengerName,
       category: item.category,
       vehicleType: item.vehicleType,
       passengerCount: item.passengerCount,
       pickup: item.pickup,
       destination: item.destination,
+      priorityTier: item.priorityTier,
+      priorityTierLabel: item.priorityTierLabel,
       priorityScore: item.priorityScore,
       priorityBreakdown: item.priorityBreakdown,
-      waitMinutes: Math.max(0, Math.floor((now.getTime() - new Date(item.createdAt).getTime()) / 60000)),
-      createdAt: item.createdAt
+      waitingDurationSeconds: item.waitingDurationSeconds || 0,
+      waitMinutes: item.waitingMinutes || Math.max(0, Math.floor((now.getTime() - new Date(item.createdAt).getTime()) / 60000)),
+      createdAt: item.createdAt,
+      sequenceNumber: item.sequenceNumber
     }));
 
     res.status(200).json({ queue });

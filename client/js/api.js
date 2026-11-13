@@ -47,6 +47,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ speed })
     }),
+  setSimulationTime: (payload) =>
+    request('/api/simulation/time', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   resetSimulation: () => request('/api/simulation/reset', { method: 'POST' }),
   completeSimulation: () => request('/api/simulation/complete', { method: 'POST' }),
   clearSimulation: () => request('/api/simulation/clear', { method: 'POST' }),

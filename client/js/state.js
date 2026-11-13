@@ -40,6 +40,16 @@ function mapBooking(b) {
   const rawPickupLabel = b.pickup?.label || (typeof b.pickup === 'string' ? b.pickup : '');
   const rawDestLabel = b.destination?.label || (typeof b.destination === 'string' ? b.destination : '');
 
+  const tier = b.priorityTier ?? b.priorityBreakdown?.tier ?? (normCat === 'senior' ? 1 : 3);
+  const tierLabel =
+    b.priorityTierLabel ??
+    b.priorityBreakdown?.tierLabel ??
+    (tier === 1
+      ? 'Senior Citizen — Highest Priority'
+      : tier === 2
+      ? 'Woman — Night Priority'
+      : 'Regular — Standard Priority');
+
   return {
     id: b.bookingId || b.id,
     userId: b.userId,
@@ -48,6 +58,12 @@ function mapBooking(b) {
     rawCategory: normCat,
     vehicle: b.vehicleId || 'Pending',
     status: b.status,
+    priorityTier: tier,
+    priorityTierLabel: tierLabel,
+    queuePosition: b.queuePosition ?? null,
+    sequenceNumber: b.sequenceNumber ?? null,
+    waitingDurationSeconds: b.waitingDurationSeconds ?? 0,
+    waitingMinutes: b.waitingMinutes ?? Math.floor((b.waitingDurationSeconds || 0) / 60),
     estPickup:
       b.estimatedPickupMinutes !== null && b.estimatedPickupMinutes !== undefined
         ? `${b.estimatedPickupMinutes} min`
@@ -72,12 +88,27 @@ function mapBooking(b) {
 
 function mapQueueItem(q) {
   const normCat = String(q.category || 'regular').toLowerCase();
+  const tier = q.priorityTier ?? q.priorityBreakdown?.tier ?? (normCat === 'senior' ? 1 : 3);
+  const tierLabel =
+    q.priorityTierLabel ??
+    q.priorityBreakdown?.tierLabel ??
+    (tier === 1
+      ? 'Senior Citizen — Highest Priority'
+      : tier === 2
+      ? 'Woman — Night Priority'
+      : 'Regular — Standard Priority');
+
   return {
     id: q.bookingId || q.id,
     userId: q.userId,
     passengerName: q.passengerName || getRandomIndianName(normCat),
     priorityScore: q.priorityScore ?? 0,
-    waitMinutes: q.waitMinutes ?? 0,
+    priorityTier: tier,
+    priorityTierLabel: tierLabel,
+    queuePosition: q.position || q.queuePosition || 1,
+    sequenceNumber: q.sequenceNumber ?? null,
+    waitingDurationSeconds: q.waitingDurationSeconds ?? 0,
+    waitMinutes: q.waitMinutes ?? Math.floor((q.waitingDurationSeconds || 0) / 60),
     category: CATEGORY_LABELS[normCat] || q.category || 'Regular',
     rawCategory: normCat,
     priorityReason: q.priorityBreakdown?.reason || '',
@@ -105,7 +136,12 @@ let store = {
   simulation: {
     status: 'Paused',
     speed: 1,
-    clockSeconds: 16 * 3600 + 35 * 60,
+    clockSeconds: 14 * 3600,
+    timeFormatted: '14:00:00',
+    simulatedTime: null,
+    simulatedTimeLabel: 'Normal Daytime',
+    timeCategory: { id: 'normal_daytime', label: 'Normal Daytime', isNight: false, hoursRange: '11:00–15:59' },
+    isNightHours: false,
     notifications: []
   }
 };
@@ -293,14 +329,40 @@ export function applySimulationState(sim) {
   if (sim) {
     store.simulation.status = sim.status || store.simulation.status;
     store.simulation.speed = sim.speed || store.simulation.speed;
-    store.simulation.simulatedTimeLabel = sim.simulatedTimeLabel || 'Daytime (Live Demo)';
+    store.simulation.simulatedTimeLabel = sim.simulatedTimeLabel || 'Normal Daytime';
     store.simulation.simulatedTime = sim.simulatedTime || null;
-    if (sim.simulatedTime) {
+    store.simulation.timeCategory = sim.timeCategory || store.simulation.timeCategory;
+    store.simulation.isNightHours = Boolean(sim.isNightHours);
+    if (typeof sim.clockSeconds === 'number') {
+      store.simulation.clockSeconds = sim.clockSeconds;
+    } else if (sim.simulatedTime) {
       const dt = new Date(sim.simulatedTime);
       store.simulation.clockSeconds = dt.getHours() * 3600 + dt.getMinutes() * 60 + dt.getSeconds();
     }
+    const hours = Math.floor((store.simulation.clockSeconds || 0) / 3600);
+    const minutes = Math.floor(((store.simulation.clockSeconds || 0) % 3600) / 60);
+    const seconds = (store.simulation.clockSeconds || 0) % 60;
+    store.simulation.timeFormatted = [hours, minutes, seconds].map((v) => String(v).padStart(2, '0')).join(':');
     store.simulation.notifications = sim.notifications || store.simulation.notifications;
     notify('simulation:updated', store.simulation);
+  }
+}
+
+export async function setSimulationTime(payload) {
+  store.loading = true;
+  notify('loading:changed', true);
+  try {
+    const res = await api.setSimulationTime(payload);
+    if (res.simulation) {
+      applySimulationState(res.simulation);
+    }
+    await refreshSimulationSnapshot();
+    return res;
+  } catch (err) {
+    store.loading = false;
+    store.error = err.message || 'Failed to update simulation time';
+    notify('data:error', store.error);
+    throw err;
   }
 }
 
@@ -369,6 +431,10 @@ export async function setSimulationSpeed(speed) {
 export function tickSimulationClock() {
   if (store.simulation.status !== 'Running') return;
   store.simulation.clockSeconds = (store.simulation.clockSeconds + store.simulation.speed) % 86400;
+  const hours = Math.floor(store.simulation.clockSeconds / 3600);
+  const minutes = Math.floor((store.simulation.clockSeconds % 3600) / 60);
+  const seconds = store.simulation.clockSeconds % 60;
+  store.simulation.timeFormatted = [hours, minutes, seconds].map((v) => String(v).padStart(2, '0')).join(':');
   notify('clock:tick', store.simulation);
 }
 
@@ -379,7 +445,12 @@ export async function resetState() {
   store.simulation = {
     status: simRes.status || 'Idle',
     speed: simRes.speed || 1,
-    clockSeconds: 16 * 3600 + 35 * 60,
+    clockSeconds: 14 * 3600,
+    timeFormatted: '14:00:00',
+    simulatedTime: null,
+    simulatedTimeLabel: 'Normal Daytime',
+    timeCategory: { id: 'normal_daytime', label: 'Normal Daytime', isNight: false, hoursRange: '11:00–15:59' },
+    isNightHours: false,
     notifications: simRes.notifications || []
   };
   await loadInitialData();

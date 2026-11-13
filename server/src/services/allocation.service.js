@@ -3,13 +3,44 @@ const Vehicle = require('../models/Vehicle');
 const { calculatePriority, sortRequestsByPriority } = require('./priority.service');
 const defaultRoutingService = require('./routing.service');
 
-// In-process mutex to serialize allocation cycles and prevent overlapping runs
+// In-process mutex to serialize allocation cycles and guarantee strict sequential reservation
 let allocationMutex = Promise.resolve();
 
 function withAllocationLock(task) {
   const run = allocationMutex.then(task, task);
   allocationMutex = run.catch(() => {});
   return run;
+}
+
+/**
+ * Retrieve all currently waiting or unassigned bookings.
+ */
+async function getWaitingBookings(BookingModel = Booking) {
+  return BookingModel.find({
+    status: { $in: ['requested', 'queued'] }
+  });
+}
+
+/**
+ * Query eligible available vehicles strictly filtered by vehicleType and seating capacity.
+ */
+async function getEligibleVehicles(booking, VehicleModel = Vehicle) {
+  return VehicleModel.find({
+    status: 'available',
+    vehicleType: booking.vehicleType,
+    capacity: { $gte: booking.passengerCount },
+    currentBookingId: null
+  });
+}
+
+/**
+ * Calculate road ETA from a vehicle to a booking's pickup coordinates via OSRM.
+ */
+async function calculateVehicleETA(vehicle, pickup, routingService = defaultRoutingService) {
+  return routingService.getRouteEstimate(
+    { lat: vehicle.latitude, lng: vehicle.longitude },
+    pickup
+  );
 }
 
 /**
@@ -48,8 +79,13 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
           $set: {
             status: 'assigned',
             vehicleId: reservedVehicle.vehicleId,
+            priorityTier: booking.priorityTier,
+            priorityTierLabel: booking.priorityTierLabel,
             priorityScore: booking.priorityScore,
             priorityBreakdown: booking.priorityBreakdown,
+            waitingDurationSeconds: booking.waitingDurationSeconds,
+            waitingMinutes: booking.waitingMinutes,
+            queuePosition: null,
             estimatedPickupMinutes: candidate.route.durationMinutes,
             routeDistanceMeters: candidate.route.distanceMeters,
             routeDurationSeconds: candidate.route.durationSeconds,
@@ -88,8 +124,15 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
 }
 
 /**
- * Run a full priority-based allocation cycle across all requested and queued bookings.
- * Accepts optional dependencies for unit testing.
+ * Run a full priority-based sequential allocation cycle.
+ *
+ * Algorithm Execution:
+ * 1. Retrieve all waiting/unassigned bookings.
+ * 2. Determine simulation time context & priority rules.
+ * 3. Sort waiting bookings by: Priority Tier -> Waiting Duration -> Sequence Number.
+ * 4. Iterate sequentially: Highest priority passenger gets nearest suitable vehicle.
+ * 5. Reserved vehicle is immediately taken off the available pool for subsequent bookings.
+ * 6. Repeat until no more eligible booking/vehicle combinations are available.
  */
 async function executeAllocationCycle(options = {}) {
   const BookingModel = options.BookingModel || Booking;
@@ -98,15 +141,13 @@ async function executeAllocationCycle(options = {}) {
   const now = options.now instanceof Date ? options.now : new Date(options.now || Date.now());
   const priorityConfig = options.priorityConfig;
 
-  const pendingBookings = await BookingModel.find({
-    status: { $in: ['requested', 'queued'] }
-  });
+  const pendingBookings = await getWaitingBookings(BookingModel);
 
   if (!pendingBookings || pendingBookings.length === 0) {
     return { allocated: [], queued: [], timestamp: now.toISOString() };
   }
 
-  // Recalculate priority scores preserving original createdAt
+  // Sort bookings strictly by Priority Tier -> Waiting Duration -> Sequence Number
   const sortedBookings = sortRequestsByPriority(pendingBookings, {
     now,
     config: priorityConfig,
@@ -117,23 +158,23 @@ async function executeAllocationCycle(options = {}) {
   const queued = [];
 
   for (const booking of sortedBookings) {
-    // Query currently available vehicles matching type and capacity
-    const eligibleVehicles = await VehicleModel.find({
-      status: 'available',
-      vehicleType: booking.vehicleType,
-      capacity: { $gte: booking.passengerCount },
-      currentBookingId: null
-    });
+    // 1. Query currently available vehicles matching type and capacity
+    const eligibleVehicles = await getEligibleVehicles(booking, VehicleModel);
 
     if (!eligibleVehicles || eligibleVehicles.length === 0) {
+      // No vehicle available; place/keep in queued state
       await BookingModel.updateOne(
         { bookingId: booking.bookingId, status: { $in: ['requested', 'queued'] } },
         {
           $set: {
             status: 'queued',
             vehicleId: null,
+            priorityTier: booking.priorityTier,
+            priorityTierLabel: booking.priorityTierLabel,
             priorityScore: booking.priorityScore,
             priorityBreakdown: booking.priorityBreakdown,
+            waitingDurationSeconds: booking.waitingDurationSeconds,
+            waitingMinutes: booking.waitingMinutes,
             estimatedPickupMinutes: null
           }
         }
@@ -141,20 +182,22 @@ async function executeAllocationCycle(options = {}) {
 
       queued.push({
         bookingId: booking.bookingId,
+        passengerName: booking.passengerName,
+        category: booking.category,
+        priorityTier: booking.priorityTier,
+        priorityTierLabel: booking.priorityTierLabel,
         priorityScore: booking.priorityScore,
         priorityBreakdown: booking.priorityBreakdown,
+        waitingDurationSeconds: booking.waitingDurationSeconds,
         reason: `No available ${booking.vehicleType} with capacity >= ${booking.passengerCount}`
       });
       continue;
     }
 
-    // Calculate road ETA for each eligible vehicle and sort by lowest ETA
+    // 2. Calculate road ETA for each eligible vehicle and sort by lowest ETA
     const candidatesWithEta = await Promise.all(
       eligibleVehicles.map(async (vehicle) => {
-        const route = await routingService.getRouteEstimate(
-          { lat: vehicle.latitude, lng: vehicle.longitude },
-          booking.pickup
-        );
+        const route = await calculateVehicleETA(vehicle, booking.pickup, routingService);
         return { vehicle, route };
       })
     );
@@ -169,6 +212,7 @@ async function executeAllocationCycle(options = {}) {
       return String(a.vehicle.vehicleId).localeCompare(String(b.vehicle.vehicleId));
     });
 
+    // 3. Sequentially reserve the best candidate
     const reservation = await reserveBestCandidate(
       booking,
       candidatesWithEta,
@@ -179,9 +223,13 @@ async function executeAllocationCycle(options = {}) {
     if (reservation) {
       allocated.push({
         bookingId: booking.bookingId,
+        passengerName: booking.passengerName,
+        category: booking.category,
         vehicleId: reservation.vehicle.vehicleId,
         vehicleType: reservation.vehicle.vehicleType,
         capacity: reservation.vehicle.capacity,
+        priorityTier: booking.priorityTier,
+        priorityTierLabel: booking.priorityTierLabel,
         priorityScore: booking.priorityScore,
         priorityBreakdown: booking.priorityBreakdown,
         estimatedPickupMinutes: reservation.route.durationMinutes,
@@ -196,8 +244,12 @@ async function executeAllocationCycle(options = {}) {
           $set: {
             status: 'queued',
             vehicleId: null,
+            priorityTier: booking.priorityTier,
+            priorityTierLabel: booking.priorityTierLabel,
             priorityScore: booking.priorityScore,
             priorityBreakdown: booking.priorityBreakdown,
+            waitingDurationSeconds: booking.waitingDurationSeconds,
+            waitingMinutes: booking.waitingMinutes,
             estimatedPickupMinutes: null
           }
         }
@@ -205,16 +257,33 @@ async function executeAllocationCycle(options = {}) {
 
       queued.push({
         bookingId: booking.bookingId,
+        passengerName: booking.passengerName,
+        category: booking.category,
+        priorityTier: booking.priorityTier,
+        priorityTierLabel: booking.priorityTierLabel,
         priorityScore: booking.priorityScore,
         priorityBreakdown: booking.priorityBreakdown,
-        reason: 'Eligible vehicles were claimed concurrently; placed in waiting queue'
+        waitingDurationSeconds: booking.waitingDurationSeconds,
+        reason: 'Eligible vehicles were claimed sequentially; placed in waiting queue'
       });
     }
   }
 
+  // Update sequential queue positions (Priority #1, Priority #2, etc.) for queued bookings
+  const queuedWithPositions = [];
+  for (let idx = 0; idx < queued.length; idx++) {
+    const qItem = queued[idx];
+    const pos = idx + 1;
+    await BookingModel.updateOne(
+      { bookingId: qItem.bookingId },
+      { $set: { queuePosition: pos } }
+    );
+    queuedWithPositions.push({ ...qItem, queuePosition: pos });
+  }
+
   return {
     allocated,
-    queued: queued.map((item, idx) => ({ ...item, queuePosition: idx + 1 })),
+    queued: queuedWithPositions,
     timestamp: now.toISOString()
   };
 }
@@ -223,5 +292,18 @@ function runAllocationCycle(options = {}) {
   return withAllocationLock(() => executeAllocationCycle(options));
 }
 
-module.exports = { runAllocationCycle, calculatePriority };
+function processWaitingQueue(options = {}) {
+  return runAllocationCycle(options);
+}
 
+module.exports = {
+  runAllocationCycle,
+  processWaitingQueue,
+  executeAllocationCycle,
+  getWaitingBookings,
+  getEligibleVehicles,
+  calculateVehicleETA,
+  reserveBestCandidate,
+  calculatePriority,
+  sortRequestsByPriority
+};

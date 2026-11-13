@@ -4,7 +4,7 @@ const User = require('../models/User');
 const { calculatePriority } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
 const { getRouteEstimate } = require('../services/routing.service');
-const { removeVehicleTrack } = require('../services/simulation.service');
+const { removeVehicleTrack, getSimulationTime, getSimulationClockSeconds } = require('../services/simulation.service');
 const socketHandler = require('../sockets/socket.handler');
 
 const INDIAN_NAME_POOLS = {
@@ -131,11 +131,13 @@ async function createBooking(req, res, next) {
     }
 
     const bookingId = `BK-${Date.now().toString().slice(-5)}${Math.floor(Math.random() * 90 + 10)}`;
-    const now = new Date();
-    const { priorityScore, priorityBreakdown } = calculatePriority(
-      { category: normalizedCategory, createdAt: now },
-      { now }
-    );
+    const simTime = getSimulationTime();
+    const simClockSecs = getSimulationClockSeconds();
+    const { priorityTier, priorityTierLabel, priorityScore, priorityBreakdown } =
+      calculatePriority(
+        { category: normalizedCategory, createdAt: simTime },
+        { now: simTime }
+      );
 
     const booking = await Booking.create({
       bookingId,
@@ -156,11 +158,18 @@ async function createBooking(req, res, next) {
       passengerCount: count,
       vehicleType: normalizedType,
       status: 'requested',
+      createdAt: simTime,
+      createdAtSimSeconds: simClockSecs,
+      simulatedTime: simTime.toISOString(),
+      priorityTier,
+      priorityTierLabel,
       priorityScore,
-      priorityBreakdown
+      priorityBreakdown,
+      waitingDurationSeconds: 0,
+      waitingMinutes: 0
     });
 
-    const allocationResult = await runAllocationCycle();
+    const allocationResult = await runAllocationCycle({ now: simTime });
     const updatedBooking = await Booking.findOne({ bookingId: booking.bookingId }).lean();
     const finalBooking = updatedBooking || booking.toObject();
 
