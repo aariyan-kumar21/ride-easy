@@ -39,16 +39,27 @@ function mapBooking(b) {
   const normCat = String(b.category || 'regular').toLowerCase();
   const rawPickupLabel = b.pickup?.label || (typeof b.pickup === 'string' ? b.pickup : '');
   const rawDestLabel = b.destination?.label || (typeof b.destination === 'string' ? b.destination : '');
+  const isNight = Boolean(store?.simulation?.isNightHours);
 
-  const tier = b.priorityTier ?? b.priorityBreakdown?.tier ?? (normCat === 'senior' ? 1 : 3);
+  const fallbackTier = isNight
+    ? (normCat === 'woman' ? 1 : (normCat === 'senior' ? 2 : 3))
+    : (normCat === 'senior' ? 1 : (normCat === 'woman' ? 2 : 3));
+
+  const tier = b.priorityTier ?? b.priorityBreakdown?.tier ?? fallbackTier;
   const tierLabel =
     b.priorityTierLabel ??
     b.priorityBreakdown?.tierLabel ??
-    (tier === 1
-      ? 'Senior Citizen — Highest Priority'
-      : tier === 2
-      ? 'Woman — Night Priority'
-      : 'Regular — Standard Priority');
+    (isNight
+      ? (tier === 1
+          ? 'Woman — Highest Priority'
+          : tier === 2
+          ? 'Senior Citizen — Second Priority'
+          : 'Regular — Third Priority')
+      : (tier === 1
+          ? 'Senior Citizen — Highest Priority'
+          : tier === 2
+          ? 'Woman — Second Priority'
+          : 'Regular — Third Priority'));
 
   return {
     id: b.bookingId || b.id,
@@ -60,7 +71,7 @@ function mapBooking(b) {
     status: b.status,
     priorityTier: tier,
     priorityTierLabel: tierLabel,
-    queuePosition: b.queuePosition ?? null,
+    queuePosition: b.queuePosition != null ? Number(b.queuePosition) : null,
     sequenceNumber: b.sequenceNumber ?? null,
     waitingDurationSeconds: b.waitingDurationSeconds ?? 0,
     waitingMinutes: b.waitingMinutes ?? Math.floor((b.waitingDurationSeconds || 0) / 60),
@@ -88,15 +99,26 @@ function mapBooking(b) {
 
 function mapQueueItem(q) {
   const normCat = String(q.category || 'regular').toLowerCase();
-  const tier = q.priorityTier ?? q.priorityBreakdown?.tier ?? (normCat === 'senior' ? 1 : 3);
+  const isNight = Boolean(store?.simulation?.isNightHours);
+  const fallbackTier = isNight
+    ? (normCat === 'woman' ? 1 : (normCat === 'senior' ? 2 : 3))
+    : (normCat === 'senior' ? 1 : (normCat === 'woman' ? 2 : 3));
+
+  const tier = q.priorityTier ?? q.priorityBreakdown?.tier ?? fallbackTier;
   const tierLabel =
     q.priorityTierLabel ??
     q.priorityBreakdown?.tierLabel ??
-    (tier === 1
-      ? 'Senior Citizen — Highest Priority'
-      : tier === 2
-      ? 'Woman — Night Priority'
-      : 'Regular — Standard Priority');
+    (isNight
+      ? (tier === 1
+          ? 'Woman — Highest Priority'
+          : tier === 2
+          ? 'Senior Citizen — Second Priority'
+          : 'Regular — Third Priority')
+      : (tier === 1
+          ? 'Senior Citizen — Highest Priority'
+          : tier === 2
+          ? 'Woman — Second Priority'
+          : 'Regular — Third Priority'));
 
   return {
     id: q.bookingId || q.id,
@@ -105,7 +127,7 @@ function mapQueueItem(q) {
     priorityScore: q.priorityScore ?? 0,
     priorityTier: tier,
     priorityTierLabel: tierLabel,
-    queuePosition: q.position || q.queuePosition || 1,
+    queuePosition: q.queuePosition != null ? Number(q.queuePosition) : (q.position != null ? Number(q.position) : null),
     sequenceNumber: q.sequenceNumber ?? null,
     waitingDurationSeconds: q.waitingDurationSeconds ?? 0,
     waitMinutes: q.waitMinutes ?? Math.floor((q.waitingDurationSeconds || 0) / 60),
@@ -179,6 +201,47 @@ export function setVehicleFilter(filter) {
   notify('filter:changed', filter);
 }
 
+function deduplicateBookings(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const b of list) {
+    if (!b || !b.id) continue;
+    if (!seen.has(b.id)) {
+      seen.add(b.id);
+      result.push(b);
+    }
+  }
+  return result;
+}
+
+function deduplicateQueue(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const q of list) {
+    if (!q || !q.id) continue;
+    if (!seen.has(q.id)) {
+      seen.add(q.id);
+      result.push(q);
+    }
+  }
+  return result;
+}
+
+function upsertBookingInList(list, newBooking) {
+  if (!newBooking || !newBooking.id) return list;
+  const index = list.findIndex((b) => b.id === newBooking.id);
+  if (index !== -1) {
+    const existing = list[index];
+    const merged = { ...existing, ...newBooking };
+    const updated = [...list];
+    updated[index] = merged;
+    return updated.filter((b, idx) => idx === index || b.id !== newBooking.id);
+  }
+  return [newBooking, ...list.filter((b) => b.id !== newBooking.id)];
+}
+
 export async function loadInitialData() {
   store.loading = true;
   store.error = null;
@@ -194,8 +257,8 @@ export async function loadInitialData() {
     ]);
 
     store.vehicles = (vehiclesRes.vehicles || []).map(mapVehicle);
-    store.bookings = (bookingsRes.bookings || []).map(mapBooking);
-    store.queue = (queueRes.queue || []).map(mapQueueItem);
+    store.bookings = deduplicateBookings((bookingsRes.bookings || []).map(mapBooking));
+    store.queue = deduplicateQueue((queueRes.queue || []).map(mapQueueItem));
     store.stats = statsRes;
     store.loading = false;
     if (healthRes.status !== 'ok') {
@@ -222,15 +285,14 @@ export async function changeVehicleStatus(vehicleId, newStatus) {
 export async function createBooking(payload) {
   const res = await api.createBooking(payload);
   const created = mapBooking(res.booking);
-  store.bookings = [created, ...store.bookings];
-  notify('booking:added', created);
+  applyBookingUpsert(res.booking, true);
   return created;
 }
 
 export async function cancelBooking(bookingId) {
   const res = await api.cancelBooking(bookingId);
   const updated = mapBooking(res.booking);
-  store.bookings = store.bookings.map((b) => (b.id === updated.id ? updated : b));
+  store.bookings = upsertBookingInList(store.bookings, updated);
   store.queue = store.queue.filter((q) => q.id !== updated.id);
   notify('booking:updated', updated);
   return updated;
@@ -239,7 +301,7 @@ export async function cancelBooking(bookingId) {
 export async function startTrip(bookingId) {
   const res = await api.startTrip(bookingId);
   const updated = mapBooking(res.booking);
-  store.bookings = store.bookings.map((b) => (b.id === updated.id ? updated : b));
+  store.bookings = upsertBookingInList(store.bookings, updated);
   if (updated.vehicle && updated.vehicle !== 'Pending') {
     store.vehicles = store.vehicles.map((v) =>
       v.id === updated.vehicle ? { ...v, status: 'on_trip' } : v
@@ -255,10 +317,10 @@ export function applyStateSync(payload) {
     store.vehicles = payload.vehicles.map(mapVehicle);
   }
   if (Array.isArray(payload.bookings)) {
-    store.bookings = payload.bookings.map(mapBooking);
+    store.bookings = deduplicateBookings(payload.bookings.map(mapBooking));
   }
   if (Array.isArray(payload.queue)) {
-    store.queue = payload.queue.map(mapQueueItem);
+    store.queue = deduplicateQueue(payload.queue.map(mapQueueItem));
   }
   if (payload.simulation) {
     store.simulation.status = payload.simulation.status || store.simulation.status;
@@ -274,13 +336,8 @@ export function applyBookingUpsert(rawBooking, isNew = false) {
   if (!rawBooking) return;
   const mapped = mapBooking(rawBooking);
   const exists = store.bookings.some((b) => b.id === mapped.id);
-  if (exists) {
-    store.bookings = store.bookings.map((b) => (b.id === mapped.id ? mapped : b));
-    notify('booking:updated', mapped);
-  } else {
-    store.bookings = [mapped, ...store.bookings];
-    notify(isNew ? 'booking:added' : 'booking:updated', mapped);
-  }
+  store.bookings = upsertBookingInList(store.bookings, mapped);
+  notify(exists ? 'booking:updated' : (isNew ? 'booking:added' : 'booking:updated'), mapped);
 
   // Lifecycle toast notifications
   if (mapped.status === 'on_trip' || mapped.status === 'arrived') {
@@ -321,8 +378,46 @@ export function applyCabStatus(rawVehicle) {
 
 export function applyQueueUpdated(queueList) {
   if (!Array.isArray(queueList)) return;
-  store.queue = queueList.map(mapQueueItem);
+  store.queue = deduplicateQueue(queueList.map(mapQueueItem));
+
+  // Sync queue positions and priority metadata into active store.bookings
+  const queueMap = new Map(store.queue.map((q) => [q.id, q]));
+  store.bookings = store.bookings.map((b) => {
+    const qItem = queueMap.get(b.id);
+    if (qItem) {
+      return {
+        ...b,
+        status: ['assigned', 'to_pickup', 'on_trip', 'completed', 'cancelled'].includes(b.status)
+          ? b.status
+          : 'queued',
+        queuePosition: qItem.queuePosition,
+        priorityTier: qItem.priorityTier,
+        priorityTierLabel: qItem.priorityTierLabel,
+        waitingDurationSeconds: qItem.waitingDurationSeconds,
+        waitingMinutes: qItem.waitMinutes,
+        priorityScore: qItem.priorityScore
+      };
+    } else if (b.status === 'queued' || b.status === 'requested') {
+      return { ...b, queuePosition: null };
+    }
+    return b;
+  });
+
+  // If there are queue items not yet in store.bookings, upsert them
+  for (const qItem of store.queue) {
+    if (!store.bookings.some((b) => b.id === qItem.id)) {
+      store.bookings = upsertBookingInList(store.bookings, mapBooking({
+        ...qItem,
+        status: 'queued',
+        bookingId: qItem.id
+      }));
+    }
+  }
+
+  store.bookings = deduplicateBookings(store.bookings);
+
   notify('queue:updated', store.queue);
+  notify('booking:updated', null);
 }
 
 export function applySimulationState(sim) {
@@ -394,8 +489,8 @@ export async function refreshSimulationSnapshot() {
     ]);
 
     store.vehicles = (vehiclesRes.vehicles || []).map(mapVehicle);
-    store.bookings = (bookingsRes.bookings || []).map(mapBooking);
-    store.queue = (queueRes.queue || []).map(mapQueueItem);
+    store.bookings = deduplicateBookings((bookingsRes.bookings || []).map(mapBooking));
+    store.queue = deduplicateQueue((queueRes.queue || []).map(mapQueueItem));
     store.simulation.status = simRes.status || store.simulation.status;
     store.simulation.speed = simRes.speed || store.simulation.speed;
     store.simulation.notifications = simRes.notifications || [];

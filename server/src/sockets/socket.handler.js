@@ -2,7 +2,7 @@ const { Server } = require('socket.io');
 const env = require('../config/env');
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
-const { calculatePriority, sortRequestsByPriority } = require('../services/priority.service');
+const { calculatePriority, sortRequestsByPriority, updateQueuePositions } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
 const simulationService = require('../services/simulation.service');
 
@@ -53,22 +53,26 @@ function emitAllocationCompleted(result) {
 }
 
 async function buildQueueSnapshot() {
-  const now = new Date();
-  const queuedBookings = await Booking.find({ status: 'queued' }).lean();
-  const sorted = sortRequestsByPriority(queuedBookings, { now, recalculate: true });
+  const now = simulationService.getSimulationTime();
+  const queueResult = await updateQueuePositions({ now });
 
-  return sorted.map((item, index) => ({
-    position: index + 1,
+  return queueResult.allQueued.map((item) => ({
+    position: item.queuePosition,
+    queuePosition: item.queuePosition,
     bookingId: item.bookingId,
     userId: item.userId,
+    passengerName: item.passengerName,
     category: item.category,
     vehicleType: item.vehicleType,
     passengerCount: item.passengerCount,
     pickup: item.pickup,
     destination: item.destination,
+    priorityTier: item.priorityTier,
+    priorityTierLabel: item.priorityTierLabel,
     priorityScore: item.priorityScore,
     priorityBreakdown: item.priorityBreakdown,
-    waitMinutes: Math.max(0, Math.floor((now.getTime() - new Date(item.createdAt).getTime()) / 60000)),
+    waitingDurationSeconds: item.waitingDurationSeconds || 0,
+    waitMinutes: item.waitingMinutes || 0,
     createdAt: item.createdAt
   }));
 }
@@ -78,6 +82,11 @@ async function broadcastQueueSnapshot() {
   try {
     const queue = await buildQueueSnapshot();
     emitQueueUpdated(queue);
+    // Broadcast updated queued bookings so Active Requests immediately sync queue positions
+    const updatedBookings = await Booking.find({ status: 'queued' }).lean();
+    for (const b of updatedBookings) {
+      safeEmit('booking:updated', b);
+    }
   } catch (err) {
     console.error('Failed to broadcast queue snapshot:', err.message);
   }

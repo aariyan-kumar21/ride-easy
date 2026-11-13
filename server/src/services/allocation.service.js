@@ -1,6 +1,6 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
-const { calculatePriority, sortRequestsByPriority } = require('./priority.service');
+const { calculatePriority, sortWaitingBookings, sortRequestsByPriority, updateQueuePositions } = require('./priority.service');
 const defaultRoutingService = require('./routing.service');
 
 // In-process mutex to serialize allocation cycles and guarantee strict sequential reservation
@@ -147,8 +147,8 @@ async function executeAllocationCycle(options = {}) {
     return { allocated: [], queued: [], timestamp: now.toISOString() };
   }
 
-  // Sort bookings strictly by Priority Tier -> Waiting Duration -> Sequence Number
-  const sortedBookings = sortRequestsByPriority(pendingBookings, {
+  // Sort bookings strictly by Priority Tier -> Batch Window -> Waiting Duration -> Sequence Number
+  const sortedBookings = sortWaitingBookings(pendingBookings, {
     now,
     config: priorityConfig,
     recalculate: true
@@ -269,21 +269,18 @@ async function executeAllocationCycle(options = {}) {
     }
   }
 
-  // Update sequential queue positions (Priority #1, Priority #2, etc.) for queued bookings
-  const queuedWithPositions = [];
-  for (let idx = 0; idx < queued.length; idx++) {
-    const qItem = queued[idx];
-    const pos = idx + 1;
-    await BookingModel.updateOne(
-      { bookingId: qItem.bookingId },
-      { $set: { queuePosition: pos } }
-    );
-    queuedWithPositions.push({ ...qItem, queuePosition: pos });
-  }
+  // Update sequential unique queue positions (Priority #1, Priority #2, etc.) separately for Cabs and Autos
+  const queueSnapshot = await updateQueuePositions({
+    BookingModel,
+    now,
+    config: priorityConfig
+  });
 
   return {
     allocated,
-    queued: queuedWithPositions,
+    queued: queueSnapshot.allQueued,
+    queuedCabs: queueSnapshot.cabs,
+    queuedAutos: queueSnapshot.autos,
     timestamp: now.toISOString()
   };
 }

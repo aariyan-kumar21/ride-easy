@@ -433,13 +433,21 @@ function syncAllMarkersFromState() {
   vehicles.forEach(updateVehicleMarker);
   applyVehicleFilter();
 
-  // 2. Active bookings that require passenger markers
-  const activeBookings = bookings.filter(
-    (b) =>
+  // 2. Active bookings that require passenger markers (deduplicated by bookingId)
+  const seenMapIds = new Set();
+  const activeBookings = [];
+  for (const b of bookings) {
+    if (!b || !b.id) continue;
+    if (seenMapIds.has(b.id)) continue;
+    if (
       ['requested', 'queued', 'assigned', 'to_pickup', 'on_trip'].includes(b.status) &&
       Array.isArray(b.pickup) &&
       b.pickup.length >= 2
-  );
+    ) {
+      seenMapIds.add(b.id);
+      activeBookings.push(b);
+    }
+  }
 
   const activeBookingIds = new Set(activeBookings.map((b) => b.id));
 

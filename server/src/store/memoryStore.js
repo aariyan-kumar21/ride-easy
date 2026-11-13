@@ -82,6 +82,7 @@ function matchesFilter(doc, filter = {}) {
     const value = doc[key];
     if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
       if ('$in' in condition && !condition.$in.includes(value)) return false;
+      if ('$nin' in condition && condition.$nin.includes(value)) return false;
       if ('$gte' in condition && !(value >= condition.$gte)) return false;
       if ('$lte' in condition && !(value <= condition.$lte)) return false;
       if ('$ne' in condition && value === condition.$ne) return false;
@@ -189,7 +190,23 @@ class InMemoryCollection {
 
   async create(doc) {
     const now = new Date();
-    const isBooking = doc.bookingId || this.name === 'bookings';
+    const isBooking = Boolean(doc.bookingId || this.name === 'bookings');
+
+    // Prevent duplicate backend records: if bookingId or _id already exists, update in-place
+    if (doc.bookingId) {
+      const existingIdx = this.data.findIndex((d) => d.bookingId === doc.bookingId);
+      if (existingIdx !== -1) {
+        Object.assign(this.data[existingIdx], deepClone(doc), { updatedAt: now });
+        return wrapDocument(this.data[existingIdx], this);
+      }
+    } else if (doc._id) {
+      const existingIdx = this.data.findIndex((d) => d._id === doc._id);
+      if (existingIdx !== -1) {
+        Object.assign(this.data[existingIdx], deepClone(doc), { updatedAt: now });
+        return wrapDocument(this.data[existingIdx], this);
+      }
+    }
+
     const sequenceNumber = doc.sequenceNumber ?? (isBooking ? ++bookingSequenceCounter : undefined);
 
     const newDoc = {
@@ -204,19 +221,39 @@ class InMemoryCollection {
   }
 
   async insertMany(docs) {
-    const inserted = docs.map((d) => {
-      const isBooking = d.bookingId || this.name === 'bookings';
+    const inserted = [];
+    const now = new Date();
+    for (const d of docs) {
+      // Prevent duplicate backend records: update existing rather than inserting another
+      if (d.bookingId) {
+        const existingIdx = this.data.findIndex((item) => item.bookingId === d.bookingId);
+        if (existingIdx !== -1) {
+          Object.assign(this.data[existingIdx], deepClone(d), { updatedAt: now });
+          inserted.push(wrapDocument(this.data[existingIdx], this));
+          continue;
+        }
+      } else if (d._id) {
+        const existingIdx = this.data.findIndex((item) => item._id === d._id);
+        if (existingIdx !== -1) {
+          Object.assign(this.data[existingIdx], deepClone(d), { updatedAt: now });
+          inserted.push(wrapDocument(this.data[existingIdx], this));
+          continue;
+        }
+      }
+
+      const isBooking = Boolean(d.bookingId || this.name === 'bookings');
       const sequenceNumber = d.sequenceNumber ?? (isBooking ? ++bookingSequenceCounter : undefined);
-      return {
+      const newDoc = {
         _id: d._id || `id_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        createdAt: d.createdAt || new Date(),
-        updatedAt: d.updatedAt || new Date(),
+        createdAt: d.createdAt || now,
+        updatedAt: d.updatedAt || now,
         ...deepClone(d),
         ...(sequenceNumber !== undefined ? { sequenceNumber } : {})
       };
-    });
-    this.data.push(...inserted);
-    return inserted.map((d) => wrapDocument(d, this));
+      this.data.push(newDoc);
+      inserted.push(wrapDocument(newDoc, this));
+    }
+    return inserted;
   }
 
   async updateOne(filter, update) {
@@ -231,6 +268,22 @@ class InMemoryCollection {
     }
     target.updatedAt = new Date();
     return { modifiedCount: 1 };
+  }
+
+  async updateMany(filter, update) {
+    let modifiedCount = 0;
+    for (const target of this.data) {
+      if (matchesFilter(target, filter)) {
+        if (update.$set) {
+          Object.assign(target, deepClone(update.$set));
+        } else {
+          Object.assign(target, deepClone(update));
+        }
+        target.updatedAt = new Date();
+        modifiedCount++;
+      }
+    }
+    return { modifiedCount };
   }
 
   findOneAndUpdate(filter, update, options = {}) {

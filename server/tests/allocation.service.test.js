@@ -115,7 +115,7 @@ describe('Smart Cab & Auto Allocation Engine', () => {
     assert.equal(result.queued[0].bookingId, 'BK-REG');
   });
 
-  it('4. Night-time woman priority (+30) beats regular passenger', async () => {
+  it('4. Night-time woman priority (+40) beats regular passenger', async () => {
     const night = new Date(2026, 10, 12, 23, 30, 0);
     const BookingModel = createInMemoryModel([
       { bookingId: 'BK-REG', category: 'regular', vehicleType: 'auto', passengerCount: 1, pickup: MG_ROAD, status: 'requested', createdAt: new Date(2026, 10, 12, 23, 25, 0) },
@@ -128,7 +128,7 @@ describe('Smart Cab & Auto Allocation Engine', () => {
 
     const result = await runAllocationCycle({ BookingModel, VehicleModel, now: night });
     assert.equal(result.allocated[0].bookingId, 'BK-WOM');
-    assert.equal(result.allocated[0].priorityScore, 30);
+    assert.equal(result.allocated[0].priorityScore, 40);
     assert.equal(result.queued[0].bookingId, 'BK-REG');
   });
 

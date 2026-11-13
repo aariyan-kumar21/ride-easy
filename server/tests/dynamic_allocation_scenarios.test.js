@@ -93,10 +93,10 @@ describe('Dynamic Time-Based Priority Allocation Scenarios', () => {
     const result = await runAllocationCycle({ BookingModel, VehicleModel, now: nightTime });
 
     assert.equal(result.allocated.length, 3);
-    // Woman C (Tier 2) allocated first despite booking later!
+    // Woman C (Tier 1 at night) allocated first despite booking later!
     assert.equal(result.allocated[0].bookingId, 'BK-WOM-C');
     assert.equal(result.allocated[0].vehicleId, 'Cab1');
-    assert.equal(result.allocated[0].priorityTier, 2);
+    assert.equal(result.allocated[0].priorityTier, 1);
 
     // Regular A allocated second
     assert.equal(result.allocated[1].bookingId, 'BK-REG-A');
@@ -125,19 +125,21 @@ describe('Dynamic Time-Based Priority Allocation Scenarios', () => {
     const result = await runAllocationCycle({ BookingModel, VehicleModel, now: daytime });
 
     assert.equal(result.allocated.length, 3);
-    // Senior C (Tier 1) allocated first!
+    // Daytime hierarchy: Senior (Tier 1) -> Woman (Tier 2) -> Regular (Tier 3)
     assert.equal(result.allocated[0].bookingId, 'BK-SEN-C');
     assert.equal(result.allocated[0].vehicleId, 'Cab1');
     assert.equal(result.allocated[0].priorityTier, 1);
 
-    // Regular A and Daytime Woman B are both Tier 3; sorted by wait time (A waited longer)
-    assert.equal(result.allocated[1].bookingId, 'BK-REG-A');
+    assert.equal(result.allocated[1].bookingId, 'BK-WOM-B');
     assert.equal(result.allocated[1].vehicleId, 'Cab2');
-    assert.equal(result.allocated[2].bookingId, 'BK-WOM-B');
+    assert.equal(result.allocated[1].priorityTier, 2);
+
+    assert.equal(result.allocated[2].bookingId, 'BK-REG-A');
     assert.equal(result.allocated[2].vehicleId, 'Cab3');
+    assert.equal(result.allocated[2].priorityTier, 3);
   });
 
-  it('Scenario D — Woman and senior citizen book during night (11:00 PM) -> Senior first, Woman second, Regular third', async () => {
+  it('Scenario D — Woman and senior citizen book during night (11:00 PM) -> Woman first, Senior second, Regular third', async () => {
     const nightTime = new Date(2026, 10, 12, 23, 0, 0);
 
     const BookingModel = createInMemoryModel([
@@ -155,15 +157,16 @@ describe('Dynamic Time-Based Priority Allocation Scenarios', () => {
     const result = await runAllocationCycle({ BookingModel, VehicleModel, now: nightTime });
 
     assert.equal(result.allocated.length, 3);
-    assert.equal(result.allocated[0].bookingId, 'BK-SEN-C'); // Senior (Tier 1)
+    // Nighttime hierarchy: Woman (Tier 1) -> Senior (Tier 2) -> Regular (Tier 3)
+    assert.equal(result.allocated[0].bookingId, 'BK-WOM-B');
     assert.equal(result.allocated[0].vehicleId, 'Cab1');
-    assert.equal(result.allocated[1].bookingId, 'BK-WOM-B'); // Night Woman (Tier 2)
+    assert.equal(result.allocated[1].bookingId, 'BK-SEN-C');
     assert.equal(result.allocated[1].vehicleId, 'Cab2');
-    assert.equal(result.allocated[2].bookingId, 'BK-REG-A'); // Regular (Tier 3)
+    assert.equal(result.allocated[2].bookingId, 'BK-REG-A');
     assert.equal(result.allocated[2].vehicleId, 'Cab3');
   });
 
-  it('Scenario E — Only one cab available at night (10:00 PM) -> Senior gets cab; others queued in strict priority order; woman gets next cab when available', async () => {
+  it('Scenario E — Only one cab available at night (10:00 PM) -> Woman gets cab; others queued in strict priority order; senior gets next cab when available', async () => {
     const nightTime = new Date(2026, 10, 12, 22, 0, 0);
 
     const BookingModel = createInMemoryModel([
@@ -180,14 +183,14 @@ describe('Dynamic Time-Based Priority Allocation Scenarios', () => {
 
     const result = await runAllocationCycle({ BookingModel, VehicleModel, now: nightTime });
 
-    // 1. Senior D receives the only cab
+    // 1. Woman C (Tier 1 at night) receives the only cab
     assert.equal(result.allocated.length, 1);
-    assert.equal(result.allocated[0].bookingId, 'BK-SEN-D');
+    assert.equal(result.allocated[0].bookingId, 'BK-WOM-C');
     assert.equal(result.allocated[0].vehicleId, 'Cab1');
 
-    // 2. Others placed in waiting queue in strict order: Woman C (#1), Regular A (#2), Regular B (#3)
+    // 2. Others placed in waiting queue in strict order: Senior D (#1), Regular A (#2), Regular B (#3)
     assert.equal(result.queued.length, 3);
-    assert.equal(result.queued[0].bookingId, 'BK-WOM-C');
+    assert.equal(result.queued[0].bookingId, 'BK-SEN-D');
     assert.equal(result.queued[0].queuePosition, 1);
     assert.equal(result.queued[1].bookingId, 'BK-REG-A');
     assert.equal(result.queued[1].queuePosition, 2);
@@ -203,12 +206,8 @@ describe('Dynamic Time-Based Priority Allocation Scenarios', () => {
       now: new Date(2026, 10, 12, 22, 10, 0)
     });
 
-    // Woman C gets the cab!
     assert.equal(secondCycle.allocated.length, 1);
-    assert.equal(secondCycle.allocated[0].bookingId, 'BK-WOM-C');
-    assert.equal(secondCycle.allocated[0].vehicleId, 'Cab1');
-
-    // Remaining in queue: Regular A (#1), Regular B (#2)
+    assert.equal(secondCycle.allocated[0].bookingId, 'BK-SEN-D'); // Senior D allocated next!
     assert.equal(secondCycle.queued.length, 2);
     assert.equal(secondCycle.queued[0].bookingId, 'BK-REG-A');
     assert.equal(secondCycle.queued[0].queuePosition, 1);
@@ -260,29 +259,37 @@ describe('Dynamic Time-Based Priority Allocation Scenarios', () => {
     }
   });
 
-  it('Dynamic Time Change — Switching simulation time from daytime to night elevates waiting women ahead of earlier regular bookings', async () => {
-    // 1. Day time: 14:00
+  it('Dynamic Time Change — Switching simulation time from daytime to night elevates waiting women ahead of senior and regular bookings', async () => {
+    // 1. Daytime: 14:00 (Daytime hierarchy: Senior (Tier 1) -> Woman (Tier 2) -> Regular (Tier 3))
     const dayTime = new Date(2026, 10, 12, 14, 0, 0);
 
     const bookings = [
       { bookingId: 'BK-REG-1', category: 'regular', vehicleType: 'cab', sequenceNumber: 1, createdAt: new Date(2026, 10, 12, 13, 50, 0) },
-      { bookingId: 'BK-WOM-1', category: 'woman', vehicleType: 'cab', sequenceNumber: 2, createdAt: new Date(2026, 10, 12, 13, 55, 0) }
+      { bookingId: 'BK-WOM-1', category: 'woman', vehicleType: 'cab', sequenceNumber: 2, createdAt: new Date(2026, 10, 12, 13, 52, 0) },
+      { bookingId: 'BK-SEN-1', category: 'senior', vehicleType: 'cab', sequenceNumber: 3, createdAt: new Date(2026, 10, 12, 13, 55, 0) }
     ];
 
-    // During daytime, Regular 1 waited longer than Woman 1, so Regular 1 is first:
+    // During daytime, Senior is Tier 1, Woman is Tier 2, Regular is Tier 3:
     const daytimeSorted = sortRequestsByPriority(bookings, { now: dayTime, recalculate: true });
-    assert.equal(daytimeSorted[0].bookingId, 'BK-REG-1');
+    assert.equal(daytimeSorted[0].bookingId, 'BK-SEN-1');
+    assert.equal(daytimeSorted[0].priorityTier, 1);
     assert.equal(daytimeSorted[1].bookingId, 'BK-WOM-1');
+    assert.equal(daytimeSorted[1].priorityTier, 2);
+    assert.equal(daytimeSorted[2].bookingId, 'BK-REG-1');
+    assert.equal(daytimeSorted[2].priorityTier, 3);
 
     // 2. User changes simulation time to Night: 22:00
+    // Nighttime hierarchy: Woman (Tier 1) -> Senior (Tier 2) -> Regular (Tier 3)
     const nightTime = new Date(2026, 10, 12, 22, 0, 0);
     const nightSorted = sortRequestsByPriority(bookings, { now: nightTime, recalculate: true });
 
-    // Woman 1 immediately promoted to Tier 2 and jumps ahead of Regular 1 (Tier 3)!
+    // Woman 1 immediately promoted to Tier 1 and jumps ahead of Senior 1 (Tier 2) and Regular 1 (Tier 3)!
     assert.equal(nightSorted[0].bookingId, 'BK-WOM-1');
-    assert.equal(nightSorted[0].priorityTier, 2);
-    assert.equal(nightSorted[1].bookingId, 'BK-REG-1');
-    assert.equal(nightSorted[1].priorityTier, 3);
+    assert.equal(nightSorted[0].priorityTier, 1);
+    assert.equal(nightSorted[1].bookingId, 'BK-SEN-1');
+    assert.equal(nightSorted[1].priorityTier, 2);
+    assert.equal(nightSorted[2].bookingId, 'BK-REG-1');
+    assert.equal(nightSorted[2].priorityTier, 3);
   });
 });
 

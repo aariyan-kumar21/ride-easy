@@ -93,7 +93,7 @@ describe('Predefined Demo Scenarios', () => {
     assert.ok(allocatedIds.includes('SC2-BK-04'));
   });
 
-  it('Scenario 3: Night-Time Priority (10:30 PM) applies woman night bonus (+30) and senior (+40)', async () => {
+  it('Scenario 3: Night-Time Priority (10:30 PM) applies woman night bonus (+40) and senior (+20)', async () => {
     const bp = getScenarioBlueprint('night_priority');
     const { BookingModel, VehicleModel } = createScenarioModels(bp);
 
@@ -110,7 +110,7 @@ describe('Predefined Demo Scenarios', () => {
     const womanAlloc = res.allocation.allocated.find((a) => a.bookingId === 'SC3-BK-06' || a.bookingId === 'SC3-BK-04');
     assert.ok(womanAlloc);
     assert.equal(womanAlloc.priorityBreakdown.isNightHours, true);
-    assert.equal(womanAlloc.priorityBreakdown.categoryBonus, 30);
+    assert.equal(womanAlloc.priorityBreakdown.categoryBonus, 40);
   });
 
   it('Scenario 4: Group Booking excludes insufficient-capacity vehicles', async () => {

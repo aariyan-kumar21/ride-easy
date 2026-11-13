@@ -14,10 +14,23 @@ export function getSocket() {
   return socket;
 }
 
+export function disconnectSocket() {
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
+}
+
 export function initSocket() {
   if (typeof io === 'undefined') {
     console.warn('Socket.IO client library not loaded; falling back to REST only.');
     return null;
+  }
+
+  // Prevent duplicate socket initialization and duplicate listener registration
+  if (socket) {
+    return socket;
   }
 
   const socketOrigin = window.location.port === '5500' ? 'http://localhost:5000' : undefined;
@@ -36,6 +49,7 @@ export function initSocket() {
     loadInitialData();
   });
 
+  // Idempotent upsert handlers using bookingId
   socket.on('state:sync', (payload) => applyStateSync(payload));
   socket.on('booking:created', (booking) => applyBookingUpsert(booking, true));
   socket.on('booking:updated', (booking) => applyBookingUpsert(booking, false));
@@ -43,10 +57,8 @@ export function initSocket() {
   socket.on('cab:status', (vehicle) => applyCabStatus(vehicle));
   socket.on('queue:updated', (payload) => applyQueueUpdated(payload?.queue || []));
   socket.on('simulation:state', (simState) => applySimulationState(simState));
-  socket.on('allocation:completed', (result) => {
-    if (result?.allocated?.length > 0) {
-      loadInitialData();
-    }
+  socket.on('allocation:completed', () => {
+    loadInitialData();
   });
 
   socket.on('disconnect', (reason) => {

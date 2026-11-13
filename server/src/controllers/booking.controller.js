@@ -1,7 +1,7 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
-const { calculatePriority } = require('../services/priority.service');
+const { calculatePriority, updateQueuePositions } = require('../services/priority.service');
 const { runAllocationCycle } = require('../services/allocation.service');
 const { getRouteEstimate } = require('../services/routing.service');
 const { removeVehicleTrack, getSimulationTime, getSimulationClockSeconds } = require('../services/simulation.service');
@@ -209,9 +209,11 @@ async function cancelBooking(req, res, next) {
       });
     }
 
+    const simTime = getSimulationTime();
     const assignedVehicleId = booking.vehicleId;
     booking.status = 'cancelled';
     booking.vehicleId = null;
+    booking.queuePosition = null;
     await booking.save();
 
     let allocationResult = null;
@@ -223,8 +225,10 @@ async function cancelBooking(req, res, next) {
         { new: true }
       ).lean();
       if (released) socketHandler.emitCabStatus(released);
-      allocationResult = await runAllocationCycle();
+      allocationResult = await runAllocationCycle({ now: simTime });
       socketHandler.emitAllocationCompleted(allocationResult);
+    } else {
+      await updateQueuePositions({ now: simTime });
     }
 
     socketHandler.emitBookingUpdated(booking.toObject());

@@ -7,34 +7,36 @@ const {
 } = require('../src/services/priority.service');
 
 describe('Priority Calculation Engine', () => {
-  it('1. Senior citizen during daytime receives +40 category bonus', () => {
+  it('1. Senior citizen during daytime receives +40 category bonus (Tier 1)', () => {
     const daytime = new Date(2026, 10, 12, 14, 0, 0); // 14:00 local
     const result = calculatePriority(
       { bookingId: 'BK-1', category: 'senior', createdAt: daytime },
       { now: daytime }
     );
 
+    assert.equal(result.priorityTier, 1);
     assert.equal(result.priorityScore, 40);
     assert.equal(result.priorityBreakdown.categoryBonus, 40);
     assert.equal(result.priorityBreakdown.waitingTimeBonus, 0);
     assert.equal(result.priorityBreakdown.isNightHours, false);
-    assert.match(result.priorityBreakdown.reason, /Senior citizen \(\+40\)/);
+    assert.match(result.priorityBreakdown.reason, /Senior citizen/);
   });
 
-  it('2. Woman during daytime receives +0 category bonus', () => {
+  it('2. Woman during daytime receives +20 category bonus (Tier 2)', () => {
     const daytime = new Date(2026, 10, 12, 11, 30, 0); // 11:30 local
     const result = calculatePriority(
       { bookingId: 'BK-2', category: 'woman', createdAt: daytime },
       { now: daytime }
     );
 
-    assert.equal(result.priorityScore, 0);
-    assert.equal(result.priorityBreakdown.categoryBonus, 0);
+    assert.equal(result.priorityTier, 2);
+    assert.equal(result.priorityScore, 20);
+    assert.equal(result.priorityBreakdown.categoryBonus, 20);
     assert.equal(result.priorityBreakdown.isNightHours, false);
-    assert.match(result.priorityBreakdown.reason, /daytime \(\+0\)/i);
+    assert.match(result.priorityBreakdown.reason, /Second Priority/i);
   });
 
-  it('3. Woman during night-time receives +30 category bonus (across midnight)', () => {
+  it('3. Woman during night-time receives +40 category bonus (Highest Priority, Tier 1 across midnight)', () => {
     const lateNight = new Date(2026, 10, 12, 23, 15, 0); // 23:15 local
     const earlyMorning = new Date(2026, 10, 13, 2, 45, 0); // 02:45 local
 
@@ -47,9 +49,11 @@ describe('Priority Calculation Engine', () => {
       { now: earlyMorning }
     );
 
-    assert.equal(resLate.priorityScore, 30);
+    assert.equal(resLate.priorityTier, 1);
+    assert.equal(resLate.priorityScore, 40);
     assert.equal(resLate.priorityBreakdown.isNightHours, true);
-    assert.equal(resEarly.priorityScore, 30);
+    assert.equal(resEarly.priorityTier, 1);
+    assert.equal(resEarly.priorityScore, 40);
     assert.equal(resEarly.priorityBreakdown.isNightHours, true);
     assert.equal(isNightHour(new Date(2026, 10, 12, 21, 0, 0)), true);
     assert.equal(isNightHour(new Date(2026, 10, 12, 22, 0, 0)), true);
@@ -58,15 +62,16 @@ describe('Priority Calculation Engine', () => {
     assert.equal(isNightHour(new Date(2026, 10, 13, 6, 0, 0)), false);
   });
 
-  it('4. Regular passenger during night-time receives +0 category bonus', () => {
+  it('4. Senior citizen during night-time receives +20 category bonus (Tier 2)', () => {
     const night = new Date(2026, 10, 12, 23, 0, 0);
     const result = calculatePriority(
-      { bookingId: 'BK-4', category: 'regular', createdAt: night },
+      { bookingId: 'BK-4', category: 'senior', createdAt: night },
       { now: night }
     );
 
-    assert.equal(result.priorityScore, 0);
-    assert.equal(result.priorityBreakdown.categoryBonus, 0);
+    assert.equal(result.priorityTier, 2);
+    assert.equal(result.priorityScore, 20);
+    assert.equal(result.priorityBreakdown.categoryBonus, 20);
     assert.equal(result.priorityBreakdown.isNightHours, true);
   });
 

@@ -84,18 +84,34 @@ const TIME_PRESETS = [
 ];
 
 const DEFAULT_PRIORITY_CONFIG = {
+  batchWindowSeconds: Number(process.env.BATCH_WINDOW_SECONDS ?? 3),
+  dayHours: {
+    startHour: Number(process.env.DAY_START_HOUR ?? 5),   // 05:00 AM
+    endHour: Number(process.env.DAY_END_HOUR ?? 21)       // 09:00 PM (21:00)
+  },
+  nightHours: {
+    startHour: Number(process.env.NIGHT_START_HOUR ?? 21), // 09:00 PM (21:00)
+    endHour: Number(process.env.NIGHT_END_HOUR ?? 5)       // 05:00 AM (05:00)
+  },
+  daytimeTiers: {
+    senior: { tier: 1, label: 'Senior Citizen — Highest Priority', bonus: 40 },
+    woman: { tier: 2, label: 'Woman — Second Priority', bonus: 20 },
+    regular: { tier: 3, label: 'Regular — Third Priority', bonus: 0 }
+  },
+  nighttimeTiers: {
+    woman: { tier: 1, label: 'Woman — Highest Priority', bonus: 40 },
+    senior: { tier: 2, label: 'Senior Citizen — Second Priority', bonus: 20 },
+    regular: { tier: 3, label: 'Regular — Third Priority', bonus: 0 }
+  },
   bonuses: {
     senior: 40,
-    womanNight: 30,
+    womanNight: 40,
+    womanDay: 20,
     regular: 0
   },
   waitingTime: {
     pointsPerFullMinute: 1,
     maxBonus: 30
-  },
-  nightHours: {
-    startHour: Number(process.env.NIGHT_START_HOUR ?? 21), // 21:00
-    endHour: Number(process.env.NIGHT_END_HOUR ?? 5)       // 05:00 (covers up to 04:59:59)
   },
   timeCategories: TIME_CATEGORIES,
   timePresets: TIME_PRESETS

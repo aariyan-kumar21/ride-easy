@@ -195,7 +195,16 @@ function renderActiveBookingRequests() {
   if (!container) return;
   const { bookings, loading, error } = getState();
 
-  const activeBookings = bookings.filter((b) => !['completed', 'cancelled'].includes(b.status));
+  const seenIds = new Set();
+  const activeBookings = [];
+  for (const b of bookings) {
+    if (!b || !b.id) continue;
+    if (seenIds.has(b.id)) continue;
+    if (!['completed', 'cancelled'].includes(b.status)) {
+      seenIds.add(b.id);
+      activeBookings.push(b);
+    }
+  }
 
   if (countBadge) {
     countBadge.textContent = String(activeBookings.length);
@@ -216,9 +225,35 @@ function renderActiveBookingRequests() {
     return;
   }
 
+  // Sort active bookings: queued bookings first in their exact priority queue order, then assigned rides
+  const sortedActiveBookings = [...activeBookings].sort((a, b) => {
+    const isQueuedA = a.status === 'queued' || a.status === 'requested';
+    const isQueuedB = b.status === 'queued' || b.status === 'requested';
+
+    if (isQueuedA && !isQueuedB) return -1;
+    if (!isQueuedA && isQueuedB) return 1;
+
+    if (isQueuedA && isQueuedB) {
+      // First by priority tier
+      const tierA = a.priorityTier ?? 3;
+      const tierB = b.priorityTier ?? 3;
+      if (tierA !== tierB) return tierA - tierB;
+
+      // Then by queue position
+      const posA = a.queuePosition ?? Number.MAX_SAFE_INTEGER;
+      const posB = b.queuePosition ?? Number.MAX_SAFE_INTEGER;
+      if (posA !== posB) return posA - posB;
+
+      // Then by sequence number
+      return (a.sequenceNumber ?? 0) - (b.sequenceNumber ?? 0);
+    }
+
+    return 0;
+  });
+
   const cancellable = new Set(['requested', 'queued', 'assigned', 'to_pickup']);
 
-  container.innerHTML = activeBookings
+  container.innerHTML = sortedActiveBookings
     .map((b) => {
       const pColor = getPassengerColor(b.rawCategory || b.category);
       const isAuto = String(b.vehicleType).toLowerCase() === 'auto';
@@ -230,11 +265,19 @@ function renderActiveBookingRequests() {
       const canStart = b.status === 'assigned' || b.status === 'to_pickup';
       const canCancel = cancellable.has(b.status);
 
-      const priorityLabel = b.priorityTierLabel || (b.priorityTier === 1 ? 'Senior Citizen — Highest Priority' : (b.priorityTier === 2 ? 'Woman — Night Priority' : 'Regular — Standard Priority'));
+      const isNight = Boolean(getState().simulation?.isNightHours);
+      const defaultDayLabel = b.priorityTier === 1
+        ? 'Senior Citizen — Highest Priority'
+        : (b.priorityTier === 2 ? 'Woman — Second Priority' : 'Regular — Third Priority');
+      const defaultNightLabel = b.priorityTier === 1
+        ? 'Woman — Highest Priority'
+        : (b.priorityTier === 2 ? 'Senior Citizen — Second Priority' : 'Regular — Third Priority');
+      const priorityLabel = b.priorityTierLabel || (isNight ? defaultNightLabel : defaultDayLabel);
       const tierClass = `tier-${b.priorityTier || 3}`;
       const isQueued = b.status === 'queued' || b.status === 'requested';
+      const posText = b.queuePosition != null ? `Priority #${b.queuePosition}` : 'In Priority Queue';
       const queueBadge = isQueued
-        ? `<span class="queue-pos-badge">Priority #${b.queuePosition || 1} &middot; Waited ${b.waitingMinutes || 0}m</span>`
+        ? `<span class="queue-pos-badge">${posText} &middot; Waited ${b.waitingMinutes || 0}m</span>`
         : '';
 
       return `
@@ -349,7 +392,17 @@ function renderActiveRidesLive() {
   const { bookings } = getState();
 
   // Active rides are assigned, to_pickup, on_trip, or queued (completed/cancelled are excluded)
-  const activeRides = bookings.filter((b) => ['assigned', 'to_pickup', 'on_trip', 'queued'].includes(b.status));
+  // Deduplicate strictly by bookingId to guarantee exactly one card per active ride
+  const seenRideIds = new Set();
+  const activeRides = [];
+  for (const b of bookings) {
+    if (!b || !b.id) continue;
+    if (seenRideIds.has(b.id)) continue;
+    if (['assigned', 'to_pickup', 'on_trip', 'queued'].includes(b.status)) {
+      seenRideIds.add(b.id);
+      activeRides.push(b);
+    }
+  }
 
   if (countBadge) {
     countBadge.textContent = String(activeRides.length);
@@ -405,7 +458,7 @@ function renderActiveRidesLive() {
         // STATE D: WAITING FOR ALLOCATION
         const waitText = isAuto ? 'WAITING FOR AUTO' : 'WAITING FOR CAB';
         statusBadgeHtml = `<span class="ride-lifecycle-badge badge-waiting">${waitText}</span>`;
-        const queuePos = b.queuePosition ? `Priority #${b.queuePosition}` : 'In Priority Queue';
+        const queuePos = b.queuePosition != null ? `Priority #${b.queuePosition}` : 'In Priority Queue';
         etaBadgeHtml = `
           <div class="ride-eta-box">
             <span class="ride-eta-label">Queue:</span>
@@ -416,7 +469,14 @@ function renderActiveRidesLive() {
         progressClass = 'progress-waiting';
       }
 
-      const priorityLabel = b.priorityTierLabel || (b.priorityTier === 1 ? 'Senior Citizen — Highest Priority' : (b.priorityTier === 2 ? 'Woman — Night Priority' : 'Regular — Standard Priority'));
+      const isNight = Boolean(getState().simulation?.isNightHours);
+      const defaultDayLabel = b.priorityTier === 1
+        ? 'Senior Citizen — Highest Priority'
+        : (b.priorityTier === 2 ? 'Woman — Second Priority' : 'Regular — Third Priority');
+      const defaultNightLabel = b.priorityTier === 1
+        ? 'Woman — Highest Priority'
+        : (b.priorityTier === 2 ? 'Senior Citizen — Second Priority' : 'Regular — Third Priority');
+      const priorityLabel = b.priorityTierLabel || (isNight ? defaultNightLabel : defaultDayLabel);
       const tierClass = `tier-${b.priorityTier || 3}`;
 
       const pickupName = b.pickupLabel || 'Pickup Location';
@@ -435,7 +495,7 @@ function renderActiveRidesLive() {
 
           <div class="ride-priority-banner ${tierClass}">
             <span class="prio-tag">${priorityLabel}</span>
-            ${b.status === 'queued' ? `<span class="queue-pos-badge">Queue #${b.queuePosition || 1} &middot; ${b.waitingMinutes || 0}m</span>` : ''}
+            ${b.status === 'queued' && b.queuePosition != null ? `<span class="queue-pos-badge">Priority #${b.queuePosition} &middot; ${b.waitingMinutes || 0}m</span>` : ''}
           </div>
 
           <div class="ride-veh-row">
@@ -492,24 +552,33 @@ function renderWaitingQueue() {
   if (!tbody) return;
   const { queue, loading } = getState();
 
-  if (loading && queue.length === 0) {
+  const seenQueueIds = new Set();
+  const uniqueQueue = [];
+  for (const q of queue) {
+    if (!q || !q.id) continue;
+    if (seenQueueIds.has(q.id)) continue;
+    seenQueueIds.add(q.id);
+    uniqueQueue.push(q);
+  }
+
+  if (loading && uniqueQueue.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" class="muted-text">Loading queue...</td></tr>';
     return;
   }
 
-  if (queue.length === 0) {
+  if (uniqueQueue.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" class="muted-text">Waiting queue is empty.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = queue
+  tbody.innerHTML = uniqueQueue
     .map(
       (item, index) => `
       <tr class="clickable-row" data-queue-id="${item.id}" title="${item.priorityReason || 'Click to focus pickup on map'}">
-        <td>#${index + 1}</td>
-        <td><strong>${item.id}</strong></td>
-        <td><span class="badge-count purple">${item.priorityScore}</span></td>
-        <td>${item.waitMinutes} min${item.priorityReason ? ` · <span class="muted-text">${item.priorityReason}</span>` : ''}</td>
+        <td>#${item.queuePosition || (index + 1)}</td>
+        <td><strong>${item.passengerName || item.id}</strong> <span class="muted-text" style="font-size:10.5px;">(${item.vehicleType || 'cab'})</span></td>
+        <td><span class="badge-count purple">${item.priorityTierLabel || `Tier ${item.priorityTier}`}</span></td>
+        <td>${item.waitMinutes || 0} min${item.priorityReason ? ` · <span class="muted-text">${item.priorityReason}</span>` : ''}</td>
       </tr>
     `
     )
