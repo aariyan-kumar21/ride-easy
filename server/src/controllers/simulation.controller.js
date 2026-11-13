@@ -57,6 +57,30 @@ async function reset(req, res, next) {
   }
 }
 
+async function complete(req, res, next) {
+  try {
+    const state = await simulationService.completeSimulation();
+    res.status(200).json(state);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function clear(req, res, next) {
+  try {
+    const state = await simulationService.clearSimulation();
+    socketHandler.emitSimulationState(state);
+    const io = socketHandler.getIO();
+    if (io) {
+      const sockets = await io.fetchSockets();
+      await Promise.all(sockets.map((s) => socketHandler.sendFullSync(s)));
+    }
+    res.status(200).json(state);
+  } catch (err) {
+    next(err);
+  }
+}
+
 function getScenarios(req, res) {
   res.status(200).json({ scenarios: scenarioService.listScenarios() });
 }
@@ -90,5 +114,5 @@ async function generateScenario(req, res, next) {
   }
 }
 
-module.exports = { getState, start, pause, resume, setSpeed, reset, getScenarios, generateScenario };
+module.exports = { getState, start, pause, resume, setSpeed, reset, complete, clear, getScenarios, generateScenario };
 

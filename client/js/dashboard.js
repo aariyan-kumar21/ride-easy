@@ -9,7 +9,9 @@ import {
   setSimulationSpeed,
   tickSimulationClock,
   runScenario,
-  resetState
+  resetState,
+  completeSimulation,
+  clearSimulation
 } from './state.js';
 import { focusVehicleOnMap, focusPickupOnMap, getPassengerColor, getShortPassengerId } from './map.js';
 
@@ -81,27 +83,34 @@ function renderStats() {
  */
 function renderActiveBookingRequests() {
   const container = document.getElementById('active-booking-requests-list');
+  const countBadge = document.getElementById('requests-count-badge');
   if (!container) return;
   const { bookings, loading, error } = getState();
 
-  if (loading && bookings.length === 0) {
+  const activeBookings = bookings.filter((b) => !['completed', 'cancelled'].includes(b.status));
+
+  if (countBadge) {
+    countBadge.textContent = String(activeBookings.length);
+  }
+
+  if (loading && activeBookings.length === 0) {
     container.innerHTML = '<div class="muted-text" style="padding:1rem;text-align:center;">Loading requests...</div>';
     return;
   }
 
-  if (error && bookings.length === 0) {
+  if (error && activeBookings.length === 0) {
     container.innerHTML = '<div class="muted-text" style="padding:1rem;text-align:center;">Unable to load requests.</div>';
     return;
   }
 
-  if (bookings.length === 0) {
+  if (activeBookings.length === 0) {
     container.innerHTML = '<div class="muted-text" style="padding:1rem;text-align:center;">No active booking requests yet.</div>';
     return;
   }
 
   const cancellable = new Set(['requested', 'queued', 'assigned']);
 
-  container.innerHTML = bookings
+  container.innerHTML = activeBookings
     .map((b) => {
       const pColor = getPassengerColor(b.userId);
       const shortId = getShortPassengerId(b.userId);
@@ -445,7 +454,7 @@ export function initDashboard() {
       updateClockUI(state.simulation);
     } else if (changeType === 'clock:tick') {
       updateClockUI(state.simulation);
-    } else if (changeType === 'state:reset') {
+    } else if (changeType === 'state:reset' || changeType === 'simulation:cleared' || changeType === 'simulation:completed') {
       updateBanner();
       renderStats();
       renderActiveBookingRequests();
@@ -502,7 +511,21 @@ export function initDashboard() {
     handleSimAction(() => resetState());
   });
 
-  // Speed selection pills (1x, 2x, 4x)
+  // Complete Simulation button
+  document.getElementById('sim-complete-btn')?.addEventListener('click', () => {
+    if (confirm('Complete all active and queued feasible rides immediately?')) {
+      handleSimAction(() => completeSimulation());
+    }
+  });
+
+  // Clear Simulation button
+  document.getElementById('sim-clear-btn')?.addEventListener('click', () => {
+    if (confirm('Clear all simulation data and reset the map with 5 available cabs?')) {
+      handleSimAction(() => clearSimulation());
+    }
+  });
+
+  // Speed selection pills (1x, 2x, 4x, 8x)
   document.querySelectorAll('.speed-pill-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const speed = Number(btn.dataset.speed) || 1;

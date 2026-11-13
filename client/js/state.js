@@ -1,5 +1,6 @@
 import { api } from './api.js';
 import { SEED_PASSENGERS } from './seedData.js';
+import { notifyBookingPickup, notifyBookingCompleted, resetToastTracking } from './toast.js';
 
 const listeners = new Set();
 
@@ -218,6 +219,13 @@ export function applyBookingUpsert(rawBooking, isNew = false) {
     store.bookings = [mapped, ...store.bookings];
     notify(isNew ? 'booking:added' : 'booking:updated', mapped);
   }
+
+  // Lifecycle toast notifications
+  if (mapped.status === 'on_trip' || mapped.status === 'arrived') {
+    notifyBookingPickup(mapped);
+  } else if (mapped.status === 'completed') {
+    notifyBookingCompleted(mapped);
+  }
 }
 
 export function applyCabLocation(payload) {
@@ -340,6 +348,7 @@ export function tickSimulationClock() {
 
 export async function resetState() {
   store.vehicleFilter = 'all';
+  resetToastTracking();
   const simRes = await api.resetSimulation();
   store.simulation = {
     status: simRes.status || 'Idle',
@@ -349,4 +358,28 @@ export async function resetState() {
   };
   await loadInitialData();
   notify('state:reset', store);
+}
+
+export async function completeSimulation() {
+  const res = await api.completeSimulation();
+  if (res.simulation) {
+    applySimulationState(res.simulation);
+  }
+  await loadInitialData();
+  notify('simulation:completed', res);
+  return res;
+}
+
+export async function clearSimulation() {
+  const res = await api.clearSimulation();
+  resetToastTracking();
+  store.simulation = {
+    status: res.simulation?.status || 'Paused',
+    speed: res.simulation?.speed || 1,
+    clockSeconds: 14 * 3600,
+    notifications: []
+  };
+  await loadInitialData();
+  notify('simulation:cleared', res);
+  return res;
 }

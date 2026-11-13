@@ -8,7 +8,7 @@ const { SEED_USERS, SEED_VEHICLES, SEED_BOOKINGS } = require('../seed/seedData')
 
 const TICK_INTERVAL_MS = 500;
 const BASE_METERS_PER_TICK = 15; // 30 m/s at 1x speed for clear demo pacing
-const ALLOWED_SPEEDS = new Set([1, 2, 5, 10]);
+const ALLOWED_SPEEDS = new Set([1, 2, 4, 8, 5, 10]);
 
 let simStatus = 'Paused'; // 'Running' | 'Paused' | 'Idle'
 let simSpeed = 1;
@@ -328,12 +328,98 @@ async function resumeSimulation(options = {}) {
 function setSimulationSpeed(speed) {
   const num = Number(speed);
   if (!ALLOWED_SPEEDS.has(num)) {
-    const err = new Error('Speed must be one of 1, 2, 5, or 10');
+    const err = new Error('Speed must be one of 1, 2, 4, 8, 5, or 10');
     err.statusCode = 400;
     throw err;
   }
   simSpeed = num;
   return getSimulationState();
+}
+
+async function completeSimulation(options = {}) {
+  const BookingModel = options.BookingModel || Booking;
+  const VehicleModel = options.VehicleModel || Vehicle;
+  const allocationService = options.allocationService || defaultAllocationService;
+
+  stopTickLoop();
+  simStatus = 'Paused';
+
+  let hasProgress = true;
+  let iterations = 0;
+  const maxIterations = 20;
+
+  while (hasProgress && iterations < maxIterations) {
+    iterations++;
+    hasProgress = false;
+
+    const activeBookings = await BookingModel.find({
+      status: { $in: ['assigned', 'to_pickup', 'on_trip'] }
+    });
+
+    for (const booking of activeBookings) {
+      hasProgress = true;
+      const vehicleId = booking.vehicleId;
+
+      if (booking.status === 'assigned' || booking.status === 'to_pickup') {
+        pushNotification('pickup_arrived', `Passenger picked up successfully! Booking: ${booking.bookingId}, Cab: ${vehicleId || 'Assigned'}`);
+      }
+
+      await BookingModel.updateOne(
+        { bookingId: booking.bookingId },
+        {
+          $set: {
+            status: 'completed',
+            estimatedPickupMinutes: 0
+          }
+        }
+      );
+
+      if (vehicleId) {
+        await VehicleModel.updateOne(
+          { vehicleId },
+          {
+            $set: {
+              status: 'available',
+              currentBookingId: null,
+              latitude: booking.destination.lat,
+              longitude: booking.destination.lng
+            }
+          }
+        );
+        activeTracks.delete(vehicleId);
+      }
+
+      pushNotification('trip_completed', `Passenger dropped off successfully! Ride completed.`);
+    }
+
+    const allocResult = await allocationService.runAllocationCycle({
+      BookingModel,
+      VehicleModel,
+      now: simulatedTimeISO ? new Date(simulatedTimeISO) : new Date()
+    });
+
+    if (allocResult && allocResult.allocated && allocResult.allocated.length > 0) {
+      hasProgress = true;
+    }
+  }
+
+  activeTracks.clear();
+
+  const emitter = getSocketEmitter();
+  if (emitter) {
+    const io = emitter.getIO ? emitter.getIO() : null;
+    if (io) {
+      const sockets = await io.fetchSockets();
+      await Promise.all(sockets.map((s) => emitter.sendFullSync(s)));
+    }
+    emitter.emitSimulationState(getSimulationState());
+  }
+
+  return getSimulationState();
+}
+
+async function clearSimulation(options = {}) {
+  return resetSimulation(options);
 }
 
 async function resetSimulation(options = {}) {
@@ -397,6 +483,8 @@ module.exports = {
   setSimulationSpeed,
   setSimulationContext,
   resetSimulation,
+  clearSimulation,
+  completeSimulation,
   getSimulationState
 };
 

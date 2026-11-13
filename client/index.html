@@ -394,6 +394,7 @@
                 <button type="button" class="speed-pill-btn active" data-speed="1">1x</button>
                 <button type="button" class="speed-pill-btn" data-speed="2">2x</button>
                 <button type="button" class="speed-pill-btn" data-speed="4">4x</button>
+                <button type="button" class="speed-pill-btn" data-speed="8">8x</button>
               </div>
 
               <button
@@ -404,6 +405,28 @@
                 aria-label="Reset Simulation"
               >
                 <i data-lucide="rotate-ccw"></i>
+              </button>
+            </div>
+
+            <!-- Complete and Clear simulation quick actions -->
+            <div class="sim-quick-actions">
+              <button
+                type="button"
+                id="sim-complete-btn"
+                class="btn-sim-action btn-complete"
+                title="Complete all active and queued feasible rides immediately"
+              >
+                <i data-lucide="check-check"></i>
+                <span>Complete Simulation</span>
+              </button>
+              <button
+                type="button"
+                id="sim-clear-btn"
+                class="btn-sim-action btn-clear"
+                title="Clear all passengers and reset map with 5 available cabs"
+              >
+                <i data-lucide="trash-2"></i>
+                <span>Clear Simulation</span>
               </button>
             </div>
 
@@ -497,5 +520,8 @@
 
   <!-- App Entry -->
   <script type="module" src="./js/app.js"></script>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>
