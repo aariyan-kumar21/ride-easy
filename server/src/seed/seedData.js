@@ -1,4 +1,4 @@
-const { connectDB, disconnectDB } = require('../config/db');
+const { resetAll } = require('../store/memoryStore');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
@@ -138,37 +138,7 @@ const SEED_BOOKINGS = [
 ];
 
 async function seedDatabase() {
-  await connectDB();
-
-  await User.bulkWrite(
-    SEED_USERS.map((u) => ({
-      updateOne: {
-        filter: { userId: u.userId },
-        update: { $setOnInsert: u },
-        upsert: true
-      }
-    }))
-  );
-
-  await Vehicle.bulkWrite(
-    SEED_VEHICLES.map((v) => ({
-      updateOne: {
-        filter: { vehicleId: v.vehicleId },
-        update: { $setOnInsert: v },
-        upsert: true
-      }
-    }))
-  );
-
-  await Booking.bulkWrite(
-    SEED_BOOKINGS.map((b) => ({
-      updateOne: {
-        filter: { bookingId: b.bookingId },
-        update: { $setOnInsert: b },
-        upsert: true
-      }
-    }))
-  );
+  resetAll();
 
   const [userCount, vehicleCount, bookingCount] = await Promise.all([
     User.countDocuments(),
@@ -176,16 +146,14 @@ async function seedDatabase() {
     Booking.countDocuments()
   ]);
 
-  console.log(`Seed complete (idempotent). Counts -> Users: ${userCount}, Vehicles: ${vehicleCount}, Bookings: ${bookingCount}`);
+  console.log(`Seed complete (in-memory). Counts -> Users: ${userCount}, Vehicles: ${vehicleCount}, Bookings: ${bookingCount}`);
 }
 
 if (require.main === module) {
   seedDatabase()
-    .then(() => disconnectDB())
     .then(() => process.exit(0))
-    .catch(async (err) => {
+    .catch((err) => {
       console.error('Seed failed:', err.message);
-      await disconnectDB();
       process.exit(1);
     });
 }

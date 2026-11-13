@@ -47,7 +47,7 @@ function updateBanner() {
     banner.textContent = `Backend Error: ${error}`;
     banner.className = 'api-banner error';
   } else if (loading) {
-    banner.textContent = 'Loading simulation data from MongoDB...';
+    banner.textContent = 'Loading simulation data...';
     banner.className = 'api-banner loading';
   } else {
     banner.className = 'api-banner hidden';
@@ -203,7 +203,7 @@ function renderFleetList() {
   }
 
   if (vehicles.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="muted-text">No vehicles found in database.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="muted-text">No vehicles found.</td></tr>';
     return;
   }
 

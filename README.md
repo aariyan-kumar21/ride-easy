@@ -10,7 +10,7 @@ See [PRD.md](./PRD.md) and [TECH_STACK.md](./TECH_STACK.md) for the complete spe
 
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript (ES Modules), Leaflet.js, OpenStreetMap tiles, Lucide Icons
 - **Backend:** Node.js, Express.js
-- **Database:** MongoDB, Mongoose
+- **Storage:** Centralized Backend In-Memory Store (fast, zero external database setup, deterministic simulation reset)
 - **Real-time:** Socket.IO
 - **Routing:** OSRM Driving Route API (with Haversine road-factor fallback)
 
@@ -64,7 +64,6 @@ Copy `server/.env.example` to `server/.env` and configure as needed:
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `PORT` | `5000` | Backend HTTP & Socket.IO server port |
-| `MONGODB_URI` | `mongodb://127.0.0.1:27017/smart_cab_simulation` | MongoDB connection string |
 | `CLIENT_ORIGIN` | `http://localhost:5500` | Allowed CORS origin for separate dev server |
 | `OSRM_BASE_URL` | `https://router.project-osrm.org` | OSRM routing server base URL |
 | `NODE_ENV` | `development` | Runtime environment (`development` / `production`) |
@@ -77,7 +76,7 @@ Copy `server/.env.example` to `server/.env` and configure as needed:
 
 ### Prerequisites
 - **Node.js** v18+ (tested on v24.14.0)
-- **MongoDB** (local service on port `27017` or MongoDB Atlas URI in `server/.env`)
+- Zero external database installation required (uses built-in high-performance backend in-memory storage)
 
 ### Setup & Run
 1. **Install backend dependencies:**

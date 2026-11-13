@@ -122,7 +122,8 @@ export async function loadInitialData() {
   notify('loading:changed', true);
 
   try {
-    const [vehiclesRes, bookingsRes, queueRes, statsRes] = await Promise.all([
+    const [healthRes, vehiclesRes, bookingsRes, queueRes, statsRes] = await Promise.all([
+      api.getHealth().catch(() => ({ status: 'unknown' })),
       api.getVehicles(),
       api.getBookings(),
       api.getQueue(),
@@ -134,7 +135,11 @@ export async function loadInitialData() {
     store.queue = (queueRes.queue || []).map(mapQueueItem);
     store.stats = statsRes;
     store.loading = false;
-    store.error = null;
+    if (healthRes.status !== 'ok') {
+      store.error = 'Backend server is not responding correctly.';
+    } else {
+      store.error = null;
+    }
     notify('data:loaded', store);
   } catch (err) {
     store.loading = false;

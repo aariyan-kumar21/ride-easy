@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
+const { resetAll } = require('../store/memoryStore');
 const defaultRoutingService = require('./routing.service');
 const defaultAllocationService = require('./allocation.service');
 const { SEED_USERS, SEED_VEHICLES, SEED_BOOKINGS } = require('../seed/seedData');
@@ -346,16 +347,7 @@ async function resetSimulation(options = {}) {
   simulatedTimeLabel = 'Daytime (Live Demo)';
 
   if (!options.skipDbReset) {
-    await Promise.all([
-      User.deleteMany({}),
-      Vehicle.deleteMany({}),
-      Booking.deleteMany({})
-    ]);
-    await Promise.all([
-      User.insertMany(SEED_USERS),
-      Vehicle.insertMany(SEED_VEHICLES),
-      Booking.insertMany(SEED_BOOKINGS)
-    ]);
+    resetAll();
   }
 
   return getSimulationState();
