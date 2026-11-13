@@ -310,21 +310,34 @@ class InMemoryCollection {
     return { modifiedCount: 1 };
   }
 
-  async findOneAndUpdate(filter, update, options = {}) {
+  findOneAndUpdate(filter, update, options = {}) {
     const idx = this.data.findIndex((d) => matchesFilter(d, filter));
-    if (idx === -1) return null;
+    const self = this;
+    let result = null;
 
-    const target = this.data[idx];
-    const prev = deepClone(target);
+    if (idx !== -1) {
+      const target = this.data[idx];
+      const prev = deepClone(target);
 
-    if (update.$set) {
-      Object.assign(target, deepClone(update.$set));
-    } else {
-      Object.assign(target, deepClone(update));
+      if (update.$set) {
+        Object.assign(target, deepClone(update.$set));
+      } else {
+        Object.assign(target, deepClone(update));
+      }
+      target.updatedAt = new Date();
+      result = options.new ? target : prev;
     }
-    target.updatedAt = new Date();
 
-    return wrapDocument(options.new ? target : prev, this);
+    const query = {
+      lean() {
+        return Promise.resolve(result ? deepClone(result) : null);
+      },
+      then(resolve, reject) {
+        return Promise.resolve(result ? wrapDocument(result, self) : null).then(resolve, reject);
+      }
+    };
+
+    return query;
   }
 
   async deleteMany(filter = {}) {
