@@ -5,6 +5,7 @@ import {
   changeVehicleStatus,
   cancelBooking,
   startTrip,
+  triggerAllocation,
   setSimulationStatus,
   setSimulationSpeed,
   tickSimulationClock,
@@ -15,6 +16,7 @@ import {
   clearSimulation
 } from './state.js';
 import { focusVehicleOnMap, focusPickupOnMap, getPassengerColor, getShortPassengerId } from './map.js';
+import { showToast } from './toast.js';
 
 let clockTimer = null;
 
@@ -208,6 +210,12 @@ function renderActiveBookingRequests() {
 
   if (countBadge) {
     countBadge.textContent = String(activeBookings.length);
+  }
+
+  const unassignedCount = activeBookings.filter((b) => b.status === 'queued' || b.status === 'requested').length;
+  const assignCabsBtn = document.getElementById('assign-cabs-btn');
+  if (assignCabsBtn) {
+    assignCabsBtn.disabled = unassignedCount === 0;
   }
 
   if (loading && activeBookings.length === 0) {
@@ -860,6 +868,52 @@ export function initDashboard() {
       if (feedback) feedback.textContent = `Error: ${err.message || 'Failed to apply time'}`;
     } finally {
       if (applyBtn) applyBtn.disabled = false;
+    }
+  });
+
+  // Assign Cabs button in Active Booking Requests section
+  const assignCabsBtn = document.getElementById('assign-cabs-btn');
+  assignCabsBtn?.addEventListener('click', async () => {
+    const { bookings } = getState();
+    const pendingCount = bookings.filter((b) => b.status === 'queued' || b.status === 'requested').length;
+
+    assignCabsBtn.disabled = true;
+    const prevHtml = assignCabsBtn.innerHTML;
+    assignCabsBtn.innerHTML = '<i data-lucide="loader-2" class="spin"></i><span>Assigning...</span>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: assignCabsBtn });
+
+    try {
+      const res = await triggerAllocation();
+      const allocatedCount = res?.allocated?.length || 0;
+      if (allocatedCount > 0) {
+        showToast({
+          title: 'Cabs Assigned',
+          message: `Successfully allotted ${allocatedCount} ${allocatedCount === 1 ? 'vehicle' : 'vehicles'} to pending requests!`,
+          type: 'success'
+        });
+      } else if (pendingCount === 0) {
+        showToast({
+          title: 'No Pending Requests',
+          message: 'All booking requests are already allotted.',
+          type: 'info'
+        });
+      } else {
+        showToast({
+          title: 'Vehicles Occupied',
+          message: 'No available vehicles found matching pending requests right now.',
+          type: 'info'
+        });
+      }
+    } catch (err) {
+      showToast({
+        title: 'Allocation Error',
+        message: err.message || 'Failed to assign cabs',
+        type: 'error'
+      });
+    } finally {
+      assignCabsBtn.innerHTML = prevHtml;
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: assignCabsBtn });
+      renderActiveBookingRequests();
     }
   });
 

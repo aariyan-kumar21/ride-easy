@@ -40,68 +40,75 @@ export function initBookingPanel() {
   const tileCab = document.getElementById('vehicle-tile-cab');
   const tileAuto = document.getElementById('vehicle-tile-auto');
 
+  const passengerCountGroup = document.getElementById('passenger-count-group');
+
   function getSelectedVehicle() {
     return form?.querySelector('input[name="vehicleType"]:checked')?.value || 'cab';
   }
 
-  function setPassengerCount(val) {
-    const veh = getSelectedVehicle();
-    const maxVal = veh === 'auto' ? 3 : 6;
-    const clamped = Math.max(1, Math.min(val, maxVal));
-
-    if (passengerInput) passengerInput.value = String(clamped);
-    if (passengerDisplay) passengerDisplay.textContent = String(clamped);
-
-    // Update toggle mode visual if appropriate
-    if (clamped >= 4) {
+  function setBookingMode(isGroup) {
+    if (isGroup) {
       toggleGrpBtn?.classList.add('active');
       toggleGrpBtn?.setAttribute('aria-selected', 'true');
       toggleIndBtn?.classList.remove('active');
       toggleIndBtn?.setAttribute('aria-selected', 'false');
+
+      // Show passenger count selector only in Group mode
+      if (passengerCountGroup) passengerCountGroup.style.display = '';
+
+      // Groups default to 4 passengers (min 2, max 6 for cab / 3 for auto)
+      const veh = getSelectedVehicle();
+      const curr = Number(passengerInput?.value || 1);
+      const startCount = curr < 2 ? (veh === 'auto' ? 3 : 4) : curr;
+      setPassengerCount(startCount, true);
     } else {
       toggleIndBtn?.classList.add('active');
       toggleIndBtn?.setAttribute('aria-selected', 'true');
       toggleGrpBtn?.classList.remove('active');
       toggleGrpBtn?.setAttribute('aria-selected', 'false');
+
+      // Hide passenger count selector completely in Individual mode (strictly 1 passenger)
+      if (passengerCountGroup) passengerCountGroup.style.display = 'none';
+      setPassengerCount(1, false);
     }
   }
 
-  // Counter Step Buttons
+  function setPassengerCount(val, isGroup) {
+    const veh = getSelectedVehicle();
+    const maxVal = veh === 'auto' ? 3 : 6;
+    const minVal = isGroup ? 2 : 1;
+    const clamped = isGroup ? Math.max(minVal, Math.min(val, maxVal)) : 1;
+
+    if (passengerInput) passengerInput.value = String(clamped);
+    if (passengerDisplay) passengerDisplay.textContent = String(clamped);
+  }
+
+  // Counter Step Buttons: only functional in Group mode
   decBtn?.addEventListener('click', () => {
-    const curr = Number(passengerInput?.value || 1);
-    setPassengerCount(curr - 1);
+    const isGroup = toggleGrpBtn?.classList.contains('active');
+    if (!isGroup) return; // Cannot modify passenger count in Individual mode
+    const curr = Number(passengerInput?.value || 2);
+    setPassengerCount(curr - 1, true);
   });
 
   incBtn?.addEventListener('click', () => {
-    const curr = Number(passengerInput?.value || 1);
-    setPassengerCount(curr + 1);
+    const isGroup = toggleGrpBtn?.classList.contains('active');
+    if (!isGroup) return; // Cannot modify passenger count in Individual mode
+    const curr = Number(passengerInput?.value || 2);
+    setPassengerCount(curr + 1, true);
   });
 
   // Individual vs Group Toggle
   toggleIndBtn?.addEventListener('click', () => {
-    toggleIndBtn.classList.add('active');
-    toggleIndBtn.setAttribute('aria-selected', 'true');
-    toggleGrpBtn?.classList.remove('active');
-    toggleGrpBtn?.setAttribute('aria-selected', 'false');
-    setPassengerCount(1);
+    setBookingMode(false);
   });
 
   toggleGrpBtn?.addEventListener('click', () => {
-    toggleGrpBtn.classList.add('active');
-    toggleGrpBtn.setAttribute('aria-selected', 'true');
-    toggleIndBtn?.classList.remove('active');
-    toggleIndBtn?.setAttribute('aria-selected', 'false');
-
-    // Groups require a Cab (seats up to 6)
-    if (tileCab) {
-      tileCab.classList.add('active');
-      const radio = tileCab.querySelector('input[type="radio"]');
-      if (radio) radio.checked = true;
-    }
-    if (tileAuto) tileAuto.classList.remove('active');
-
-    setPassengerCount(4);
+    setBookingMode(true);
   });
+
+  // Initialize strictly in Individual mode (passenger counter hidden, count = 1)
+  setBookingMode(false);
 
   // Vehicle Selection Tiles
   tileCab?.addEventListener('click', () => {
@@ -118,9 +125,12 @@ export function initBookingPanel() {
     if (radio) radio.checked = true;
 
     // Auto max capacity is 3
-    const curr = Number(passengerInput?.value || 1);
-    if (curr > 3) {
-      setPassengerCount(3);
+    const isGroup = toggleGrpBtn?.classList.contains('active');
+    if (isGroup) {
+      const curr = Number(passengerInput?.value || 1);
+      if (curr > 3) {
+        setPassengerCount(3, true);
+      }
     }
   });
 
@@ -175,8 +185,10 @@ export function initBookingPanel() {
         destination: { lat: destLat, lng: destLng, label: destLabel }
       });
 
-      const assignedText = created.vehicle && created.vehicle !== 'Pending' ? `Assigned to ${created.vehicle}` : 'Queued for priority allocation';
-      showFeedback(feedbackEl, `Ride ${created.id} requested! ${assignedText}.`);
+      const assignedText = created.vehicle && created.vehicle !== 'Pending'
+        ? `Assigned to ${created.vehicle}`
+        : 'Added to Active Requests. Click "Assign Cabs" when ready.';
+      showFeedback(feedbackEl, `Ride ${created.id} requested! ${assignedText}`);
     } catch (err) {
       showFeedback(feedbackEl, err.message || 'Failed to create booking.', true);
     } finally {

@@ -36,6 +36,7 @@ export const api = {
     request(`/api/bookings/${encodeURIComponent(bookingId)}/start`, {
       method: 'POST'
     }),
+  triggerAllocation: () => request('/api/allocate', { method: 'POST' }),
   getQueue: () => request('/api/queue'),
   getAdminStats: () => request('/api/admin/stats'),
   getSimulationState: () => request('/api/simulation/state'),

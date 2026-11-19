@@ -169,21 +169,37 @@ async function createBooking(req, res, next) {
       waitingMinutes: 0
     });
 
-    const allocationResult = await runAllocationCycle({ now: simTime });
+    let allocationResult = { allocated: [], queued: [] };
+    if (req.body.autoAllocate === true) {
+      allocationResult = await runAllocationCycle({ now: simTime });
+      const updatedBooking = await Booking.findOne({ bookingId: booking.bookingId }).lean();
+      const finalBooking = updatedBooking || booking.toObject();
+
+      socketHandler.emitBookingCreated(finalBooking);
+      socketHandler.emitAllocationCompleted(allocationResult);
+      if (finalBooking.vehicleId) {
+        const veh = await Vehicle.findOne({ vehicleId: finalBooking.vehicleId }).lean();
+        if (veh) socketHandler.emitCabStatus(veh);
+      }
+      await socketHandler.broadcastQueueSnapshot();
+
+      return res.status(201).json({
+        booking: finalBooking,
+        allocation: allocationResult
+      });
+    }
+
+    // Manual allocation mode (default): booking is queued in priority order and waits for "Assign Cabs"
+    await updateQueuePositions({ now: simTime });
     const updatedBooking = await Booking.findOne({ bookingId: booking.bookingId }).lean();
     const finalBooking = updatedBooking || booking.toObject();
 
     socketHandler.emitBookingCreated(finalBooking);
-    socketHandler.emitAllocationCompleted(allocationResult);
-    if (finalBooking.vehicleId) {
-      const veh = await Vehicle.findOne({ vehicleId: finalBooking.vehicleId }).lean();
-      if (veh) socketHandler.emitCabStatus(veh);
-    }
     await socketHandler.broadcastQueueSnapshot();
 
     return res.status(201).json({
       booking: finalBooking,
-      allocation: allocationResult
+      allocation: { allocated: [], queued: [finalBooking] }
     });
   } catch (err) {
     return next(err);

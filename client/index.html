@@ -150,8 +150,8 @@
             </div>
 
             <!-- Passenger Count & Category -->
-            <div class="form-split-row">
-              <div class="form-field-group half">
+            <div class="form-split-row" id="passenger-row-container">
+              <div class="form-field-group half" id="passenger-count-group" style="display: none;">
                 <label class="field-label">Passengers</label>
                 <div class="counter-pill">
                   <button type="button" id="passenger-dec-btn" class="counter-step-btn" aria-label="Decrease passengers">−</button>
@@ -161,7 +161,7 @@
                 </div>
               </div>
 
-              <div class="form-field-group half">
+              <div class="form-field-group half" id="passenger-category-group">
                 <label for="passenger-category" class="field-label">Category</label>
                 <div class="select-pill">
                   <select id="passenger-category" aria-label="Passenger Category">
@@ -217,8 +217,12 @@
           <div class="card-header-clean">
             <div class="title-with-pill">
               <h2 class="card-heading">Active Booking Requests</h2>
-              <span id="requests-count-badge" class="badge-count purple">5</span>
+              <span id="requests-count-badge" class="badge-count purple">0</span>
             </div>
+            <button type="button" id="assign-cabs-btn" class="btn-assign-cabs" title="Allocate available cabs to pending requests">
+              <i data-lucide="check-circle-2"></i>
+              <span>Assign Cabs</span>
+            </button>
           </div>
 
           <div id="active-booking-requests-list" class="requests-list-container" role="feed">

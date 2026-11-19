@@ -373,5 +373,80 @@ describe('Deduplication & Canonical Booking ID Scenarios', () => {
     assert.equal(allRajesh[1].bookingId, 'BK-NAME-02');
     assert.notEqual(allRajesh[0].bookingId, allRajesh[1].bookingId);
   });
+
+  it('Test 7 — Manual batch allocation (Assign Cabs): requests stay queued until allocation is triggered', async () => {
+    await Vehicle.deleteMany({});
+    for (let i = 1; i <= 3; i++) {
+      await Vehicle.create({
+        vehicleId: `Cab${i}`,
+        vehicleType: 'cab',
+        capacity: 4,
+        status: 'available',
+        latitude: 12.97 + i * 0.005,
+        longitude: 77.59 + i * 0.005,
+        currentBookingId: null
+      });
+    }
+
+    const simTime = new Date('2026-11-14T14:00:00.000Z');
+
+    // 1. Submit 4 requests without allocating
+    const pax = [
+      { id: 'BK-MAN-01', cat: 'regular', name: 'Regular 1' },
+      { id: 'BK-MAN-02', cat: 'senior', name: 'Senior 1' },
+      { id: 'BK-MAN-03', cat: 'woman', name: 'Woman 1' },
+      { id: 'BK-MAN-04', cat: 'regular', name: 'Regular 2' }
+    ];
+
+    for (let i = 0; i < pax.length; i++) {
+      await Booking.create({
+        bookingId: pax[i].id,
+        userId: `U${i + 1}`,
+        passengerName: pax[i].name,
+        category: pax[i].cat,
+        vehicleType: 'cab',
+        passengerCount: 1,
+        pickup: { lat: 12.9716, lng: 77.5946, label: 'MG Road' },
+        destination: { lat: 12.9784, lng: 77.6408, label: 'Indiranagar' },
+        status: 'requested',
+        createdAt: new Date(simTime.getTime() + i * 1000)
+      });
+    }
+
+    // Update queue positions (simulates what createBooking does now)
+    await updateQueuePositions({ BookingModel: Booking, now: simTime });
+
+    // Assert all 4 are queued and none are assigned
+    const preAllocBookings = await Booking.find({}).lean();
+    assert.equal(preAllocBookings.filter((b) => b.status === 'assigned').length, 0, 'No cabs allocated yet');
+    assert.equal(preAllocBookings.filter((b) => b.status === 'queued').length, 4, 'All 4 requests are queued in Active Requests');
+
+    // Priority ordering check in Daytime: Senior is #1, Woman is #2, Regulars are #3, #4
+    const seniorBooking = preAllocBookings.find((b) => b.bookingId === 'BK-MAN-02');
+    const womanBooking = preAllocBookings.find((b) => b.bookingId === 'BK-MAN-03');
+    assert.equal(seniorBooking.queuePosition, 1, 'Senior is Priority #1');
+    assert.equal(womanBooking.queuePosition, 2, 'Woman is Priority #2');
+
+    // 2. Trigger "Assign Cabs"
+    const allocResult = await executeAllocationCycle({
+      BookingModel: Booking,
+      VehicleModel: Vehicle,
+      routingService: mockRoutingService,
+      now: simTime
+    });
+
+    // 3 available cabs allocated to top 3 priority requests
+    assert.equal(allocResult.allocated.length, 3, 'Exactly 3 cabs allocated');
+    assert.equal(allocResult.allocated[0].bookingId, 'BK-MAN-02', 'Senior receives first cab');
+    assert.equal(allocResult.allocated[1].bookingId, 'BK-MAN-03', 'Woman receives second cab');
+    assert.equal(allocResult.allocated[2].bookingId, 'BK-MAN-01', 'Earlier regular receives third cab');
+
+    // Fourth request remains in queue as Priority #1
+    const postAllocBookings = await Booking.find({}).lean();
+    const remainingQueued = postAllocBookings.filter((b) => b.status === 'queued');
+    assert.equal(remainingQueued.length, 1, 'Remaining excess request stays queued');
+    assert.equal(remainingQueued[0].bookingId, 'BK-MAN-04');
+    assert.equal(remainingQueued[0].queuePosition, 1);
+  });
 });
 

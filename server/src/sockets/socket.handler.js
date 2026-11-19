@@ -207,20 +207,51 @@ function initSocket(httpServer) {
           priorityBreakdown
         });
 
-        const allocationResult = await runAllocationCycle();
-        const finalBooking = (await Booking.findOne({ bookingId }).lean()) || created.toObject();
+        let allocationResult = { allocated: [], queued: [] };
+        if (payload.autoAllocate === true) {
+          allocationResult = await runAllocationCycle();
+          const finalBooking = (await Booking.findOne({ bookingId }).lean()) || created.toObject();
 
-        emitBookingCreated(finalBooking);
-        emitAllocationCompleted(allocationResult);
-        if (finalBooking.vehicleId) {
-          const veh = await Vehicle.findOne({ vehicleId: finalBooking.vehicleId }).lean();
-          if (veh) emitCabStatus(veh);
+          emitBookingCreated(finalBooking);
+          emitAllocationCompleted(allocationResult);
+          if (finalBooking.vehicleId) {
+            const veh = await Vehicle.findOne({ vehicleId: finalBooking.vehicleId }).lean();
+            if (veh) emitCabStatus(veh);
+          }
+          await broadcastQueueSnapshot();
+
+          if (typeof ack === 'function') ack({ ok: true, booking: finalBooking, allocation: allocationResult });
+        } else {
+          await updateQueuePositions({ now });
+          const finalBooking = (await Booking.findOne({ bookingId }).lean()) || created.toObject();
+
+          emitBookingCreated(finalBooking);
+          await broadcastQueueSnapshot();
+
+          if (typeof ack === 'function') ack({ ok: true, booking: finalBooking, allocation: { allocated: [], queued: [finalBooking] } });
         }
-        await broadcastQueueSnapshot();
-
-        if (typeof ack === 'function') ack({ ok: true, booking: finalBooking, allocation: allocationResult });
       } catch (err) {
         if (typeof ack === 'function') ack({ ok: false, error: 'Failed to create booking' });
+      }
+    });
+
+    socket.on('allocation:trigger', async (ack) => {
+      try {
+        const now = simulationService.getSimulationTime();
+        const result = await runAllocationCycle({ now });
+        emitAllocationCompleted(result);
+        for (const alloc of result.allocated || []) {
+          if (alloc.vehicleId) {
+            const veh = await Vehicle.findOne({ vehicleId: alloc.vehicleId }).lean();
+            if (veh) emitCabStatus(veh);
+          }
+          const updatedBooking = await Booking.findOne({ bookingId: alloc.bookingId }).lean();
+          if (updatedBooking) emitBookingUpdated(updatedBooking);
+        }
+        await broadcastQueueSnapshot();
+        if (typeof ack === 'function') ack({ ok: true, allocation: result });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: 'Allocation failed' });
       }
     });
 

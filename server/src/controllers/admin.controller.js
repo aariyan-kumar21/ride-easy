@@ -103,8 +103,17 @@ async function getAdminStats(req, res, next) {
 
 async function triggerAllocation(req, res, next) {
   try {
-    const result = await runAllocationCycle();
+    const now = getSimulationTime();
+    const result = await runAllocationCycle({ now });
     socketHandler.emitAllocationCompleted(result);
+    for (const alloc of result.allocated || []) {
+      if (alloc.vehicleId) {
+        const veh = await Vehicle.findOne({ vehicleId: alloc.vehicleId }).lean();
+        if (veh) socketHandler.emitCabStatus(veh);
+      }
+      const updatedBooking = await Booking.findOne({ bookingId: alloc.bookingId }).lean();
+      if (updatedBooking) socketHandler.emitBookingUpdated(updatedBooking);
+    }
     await socketHandler.broadcastQueueSnapshot();
     res.status(200).json(result);
   } catch (err) {

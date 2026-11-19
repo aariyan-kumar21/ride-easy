@@ -311,6 +311,13 @@ export async function startTrip(bookingId) {
   return updated;
 }
 
+export async function triggerAllocation() {
+  const res = await api.triggerAllocation();
+  await loadInitialData();
+  notify('allocation:completed', res);
+  return res;
+}
+
 export function applyStateSync(payload) {
   if (!payload) return;
   if (Array.isArray(payload.vehicles)) {

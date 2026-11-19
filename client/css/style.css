@@ -723,6 +723,45 @@ button {
   flex-direction: column;
 }
 
+.btn-assign-cabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background: linear-gradient(135deg, var(--primary-purple) 0%, #753EEB 100%);
+  color: #FFFFFF;
+  border: 1px solid var(--primary-purple);
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(137, 84, 246, 0.25);
+  white-space: nowrap;
+}
+
+.btn-assign-cabs:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7C45EB 0%, #632FD4 100%);
+  box-shadow: 0 4px 12px rgba(137, 84, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-assign-cabs:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-assign-cabs:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-assign-cabs i {
+  width: 13px;
+  height: 13px;
+}
+
 .requests-list-container {
   display: flex;
   flex-direction: column;
