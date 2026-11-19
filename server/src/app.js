@@ -43,6 +43,9 @@ app.use('/api/traffic', trafficRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api', adminRoutes);
 
+// Explicitly return 204 No Content for favicon requests
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Serve static frontend files
 const clientDir = path.resolve(__dirname, '../../client');
 app.use(express.static(clientDir));
