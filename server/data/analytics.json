@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "savedAt": "2026-11-19T17:22:47.181Z",
-  "count": 1,
+  "savedAt": "2026-11-19T17:37:26.287Z",
+  "count": 4,
   "recordedArrivals": [
     {
       "bookingId": "BK-SIM-2",
@@ -18,7 +18,58 @@
       "timePeriod": "normal",
       "isMorningPeak": false,
       "isEveningPeak": false,
-      "recordedAt": "2026-11-19T17:22:45.171Z"
+      "recordedAt": "2026-11-19T17:08:41.505Z"
+    },
+    {
+      "bookingId": "BK-0634986",
+      "area": "Cubbon Park",
+      "pickupLabel": "Cubbon Park Metro",
+      "vehicleType": "cab",
+      "bookingCreatedAt": "2026-11-12T08:30:00.000Z",
+      "vehicleAssignedAt": "2026-11-12T08:32:26.000Z",
+      "vehicleArrivedAt": "2026-11-12T08:34:50.000Z",
+      "arrivalDurationSeconds": 290,
+      "arrivalDurationMinutes": 5,
+      "assignmentDelaySeconds": 146,
+      "assignmentDelayMinutes": 2,
+      "timePeriod": "normal",
+      "isMorningPeak": false,
+      "isEveningPeak": false,
+      "recordedAt": "2026-11-19T17:37:03.721Z"
+    },
+    {
+      "bookingId": "BK-0722799",
+      "area": "Cubbon Park",
+      "pickupLabel": "Cubbon Park Metro",
+      "vehicleType": "cab",
+      "bookingCreatedAt": "2026-11-12T08:30:00.000Z",
+      "vehicleAssignedAt": "2026-11-12T08:32:26.000Z",
+      "vehicleArrivedAt": "2026-11-12T08:37:30.000Z",
+      "arrivalDurationSeconds": 450,
+      "arrivalDurationMinutes": 8,
+      "assignmentDelaySeconds": 146,
+      "assignmentDelayMinutes": 2,
+      "timePeriod": "normal",
+      "isMorningPeak": false,
+      "isEveningPeak": false,
+      "recordedAt": "2026-11-19T17:37:15.543Z"
+    },
+    {
+      "bookingId": "BK-8708179",
+      "area": "Cubbon Park",
+      "pickupLabel": "Cubbon Park Metro",
+      "vehicleType": "cab",
+      "bookingCreatedAt": "2026-11-12T08:30:00.000Z",
+      "vehicleAssignedAt": "2026-11-12T08:32:26.000Z",
+      "vehicleArrivedAt": "2026-11-12T08:39:38.000Z",
+      "arrivalDurationSeconds": 578,
+      "arrivalDurationMinutes": 10,
+      "assignmentDelaySeconds": 146,
+      "assignmentDelayMinutes": 2,
+      "timePeriod": "normal",
+      "isMorningPeak": false,
+      "isEveningPeak": false,
+      "recordedAt": "2026-11-19T17:37:24.276Z"
     }
   ]
 }
