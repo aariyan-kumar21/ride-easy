@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "start": "npm --prefix server start",
-    "dev": "npm --prefix server run dev"
+    "build": "npm --prefix server install",
+    "dev": "npm --prefix server run dev",
+    "test": "npm --prefix server test"
   }
 }
 

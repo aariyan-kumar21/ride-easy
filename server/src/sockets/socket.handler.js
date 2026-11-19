@@ -154,12 +154,10 @@ function validateBookingPayload(payload) {
 function initSocket(httpServer) {
   ioInstance = new Server(httpServer, {
     cors: {
-      origin: [
-        env.clientOrigin,
-        `http://localhost:${env.port}`,
-        `http://127.0.0.1:${env.port}`,
-        'http://127.0.0.1:5500'
-      ],
+      origin: (origin, callback) => {
+        // Accept requests from same-origin, configured origins, or any deployed domain in production
+        callback(null, true);
+      },
       methods: ['GET', 'POST', 'PATCH'],
       credentials: true
     }

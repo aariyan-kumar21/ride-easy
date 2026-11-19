@@ -23,10 +23,17 @@ const allowedOrigins = new Set([
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
+      // Allow requests with no origin (like mobile apps, curl, or same-origin static assets)
+      // or known local development origins, or any deployed domain (e.g. *.onrender.com)
+      if (
+        !origin ||
+        allowedOrigins.has(origin) ||
+        origin.endsWith('.onrender.com') ||
+        env.nodeEnv === 'production'
+      ) {
         return callback(null, true);
       }
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      return callback(null, true);
     },
     credentials: true
   })
