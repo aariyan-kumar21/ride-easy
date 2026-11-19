@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "savedAt": "2026-11-19T13:49:39.283Z",
+  "savedAt": "2026-11-19T14:51:10.543Z",
   "count": 1,
   "recordedArrivals": [
     {
@@ -18,7 +18,7 @@
       "timePeriod": "normal",
       "isMorningPeak": false,
       "isEveningPeak": false,
-      "recordedAt": "2026-11-19T13:49:37.276Z"
+      "recordedAt": "2026-11-19T14:51:08.533Z"
     }
   ]
 }

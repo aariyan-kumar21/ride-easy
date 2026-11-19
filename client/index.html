@@ -37,21 +37,17 @@
 
       <!-- Center: Navigation Tabs -->
       <nav class="nav-center" aria-label="Main Navigation">
-        <button type="button" class="nav-tab active" data-tab="simulation">
+        <button type="button" class="nav-tab active" id="nav-tab-simulation" data-tab="simulation" title="Live Simulation View">
           <i data-lucide="play-circle"></i>
           <span>Simulation</span>
         </button>
-        <button type="button" class="nav-tab" data-tab="analytics">
-          <i data-lucide="bar-chart-2"></i>
-          <span>Analytics</span>
+        <button type="button" class="nav-tab" id="nav-tab-traffic" data-tab="traffic" title="Toggle Real-Time Bengaluru Traffic Heatmap">
+          <i data-lucide="activity"></i>
+          <span>Traffic Heatmap</span>
         </button>
-        <button type="button" class="nav-tab" data-tab="fleet">
-          <i data-lucide="car"></i>
-          <span>Fleet</span>
-        </button>
-        <button type="button" class="nav-tab" data-tab="settings">
-          <i data-lucide="sliders"></i>
-          <span>Settings</span>
+        <button type="button" class="nav-tab" id="nav-tab-arrival" data-tab="arrival" title="Toggle Area Cab Arrival Times on Map">
+          <i data-lucide="clock"></i>
+          <span>Arrival Time</span>
         </button>
       </nav>
 
@@ -283,14 +279,6 @@
               </button>
               <button type="button" id="map-zoom-out-btn" class="map-icon-btn" title="Zoom Out">
                 <i data-lucide="minus"></i>
-              </button>
-              <button type="button" id="map-traffic-toggle" class="map-filter-btn" title="Toggle Real-Time Bengaluru Traffic Heatmap">
-                <i data-lucide="activity"></i>
-                <span>Traffic Heatmap</span>
-              </button>
-              <button type="button" id="map-analytics-toggle" class="map-filter-btn" title="Toggle Arrival Analytics Map Badges">
-                <i data-lucide="bar-chart-2"></i>
-                <span>Arrival Analytics</span>
               </button>
               <button type="button" id="map-vehicles-toggle" class="map-filter-btn active" title="Toggle Fleet">
                 <i data-lucide="car"></i>

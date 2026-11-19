@@ -193,6 +193,8 @@ button {
   color: var(--text-secondary);
   transition: all var(--transition-fast);
   border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
 }
 
 .nav-tab i {

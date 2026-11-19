@@ -610,6 +610,51 @@ function renderArrivalAnalyticsBadges() {
   });
 }
 
+export function toggleTrafficHeatmap(forceState = null) {
+  showTrafficHeatmap = forceState !== null ? Boolean(forceState) : !showTrafficHeatmap;
+  const trafficLegend = document.getElementById('traffic-heatmap-legend');
+  const navTrafficBtn = document.getElementById('nav-tab-traffic');
+
+  if (navTrafficBtn) {
+    navTrafficBtn.classList.toggle('active', showTrafficHeatmap);
+  }
+  if (trafficLegend) {
+    trafficLegend.classList.toggle('hidden', !showTrafficHeatmap);
+  }
+
+  if (showTrafficHeatmap) {
+    if (trafficTileLayer && mapInstance) {
+      trafficTileLayer.addTo(mapInstance);
+    }
+    if (!trafficRefreshInterval) {
+      trafficRefreshInterval = setInterval(() => {
+        if (showTrafficHeatmap && trafficTileLayer) {
+          trafficTileLayer.redraw();
+        }
+      }, 3 * 60 * 1000);
+    }
+  } else {
+    if (trafficTileLayer && mapInstance) {
+      mapInstance.removeLayer(trafficTileLayer);
+    }
+    if (trafficRefreshInterval) {
+      clearInterval(trafficRefreshInterval);
+      trafficRefreshInterval = null;
+    }
+  }
+  return showTrafficHeatmap;
+}
+
+export function toggleArrivalAnalytics(forceState = null) {
+  showArrivalAnalytics = forceState !== null ? Boolean(forceState) : !showArrivalAnalytics;
+  const navArrivalBtn = document.getElementById('nav-tab-arrival');
+  if (navArrivalBtn) {
+    navArrivalBtn.classList.toggle('active', showArrivalAnalytics);
+  }
+  renderArrivalAnalyticsBadges();
+  return showArrivalAnalytics;
+}
+
 export function initMap() {
   const container = document.getElementById('map-container');
   if (!container || typeof L === 'undefined') return;
@@ -703,37 +748,18 @@ export function initMap() {
 
   const passengersBtn = document.getElementById('map-passengers-toggle');
   const vehiclesBtn = document.getElementById('map-vehicles-toggle');
-  const trafficBtn = document.getElementById('map-traffic-toggle');
-  const analyticsBtn = document.getElementById('map-analytics-toggle');
-  const trafficLegend = document.getElementById('traffic-heatmap-legend');
+  const navTrafficBtn = document.getElementById('nav-tab-traffic');
+  const navArrivalBtn = document.getElementById('nav-tab-arrival');
 
-  trafficBtn?.addEventListener('click', () => {
-    showTrafficHeatmap = !showTrafficHeatmap;
-    trafficBtn.classList.toggle('active', showTrafficHeatmap);
-    if (trafficLegend) trafficLegend.classList.toggle('hidden', !showTrafficHeatmap);
-
-    if (showTrafficHeatmap) {
-      trafficTileLayer.addTo(mapInstance);
-      if (!trafficRefreshInterval) {
-        trafficRefreshInterval = setInterval(() => {
-          if (showTrafficHeatmap && trafficTileLayer) {
-            trafficTileLayer.redraw();
-          }
-        }, 3 * 60 * 1000);
-      }
-    } else {
-      mapInstance.removeLayer(trafficTileLayer);
-      if (trafficRefreshInterval) {
-        clearInterval(trafficRefreshInterval);
-        trafficRefreshInterval = null;
-      }
-    }
+  // Top navbar direct On/Off toggles for Traffic Heatmap and Arrival Time
+  navTrafficBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleTrafficHeatmap();
   });
 
-  analyticsBtn?.addEventListener('click', () => {
-    showArrivalAnalytics = !showArrivalAnalytics;
-    analyticsBtn.classList.toggle('active', showArrivalAnalytics);
-    renderArrivalAnalyticsBadges();
+  navArrivalBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleArrivalAnalytics();
   });
 
   passengersBtn?.addEventListener('click', () => {
@@ -768,6 +794,8 @@ export function initMap() {
     upsertBookingRoute,
     removeBookingRoute,
     clearAllPassengerMarkersAndRoutes,
-    resetMapView
+    resetMapView,
+    toggleTrafficHeatmap,
+    toggleArrivalAnalytics
   };
 }

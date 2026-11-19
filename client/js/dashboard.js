@@ -773,21 +773,10 @@ export function initDashboard() {
   document.getElementById('modal-backdrop')?.addEventListener('click', closeDrawer);
 
   // Top Nav Tabs
-  document.querySelectorAll('.nav-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const tabName = tab.dataset.tab;
-      document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      if (tabName === 'fleet') {
-        openDrawer('Fleet Management');
-      } else if (tabName === 'analytics') {
-        openDrawer('Analytics & Queue');
-      } else if (tabName === 'settings') {
-        const ctrlCard = document.getElementById('controls-card');
-        ctrlCard?.scrollIntoView({ behavior: 'smooth' });
-      }
-    });
+  document.getElementById('nav-tab-simulation')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeDrawer();
+    document.getElementById('map-section')?.scrollIntoView({ behavior: 'smooth' });
   });
 
   const handleSimAction = async (fn) => {
