@@ -5,8 +5,13 @@ let mapInstance = null;
 let routeLayerGroup = null;
 let vehicleLayer = null;
 let passengerLayer = null;
+let trafficTileLayer = null;
+let trafficRefreshInterval = null;
+let analyticsMarkerLayer = null;
 let showVehicles = true;
 let showPassengers = true;
+let showTrafficHeatmap = false;
+let showArrivalAnalytics = false;
 
 // Marker & route reference maps for in-place updates without recreating the map
 const vehicleMarkers = new Map();
@@ -14,6 +19,7 @@ const passengerMarkers = new Map();
 const destinationMarkers = new Map();
 const routeLayers = new Map();
 const vehicleHeadings = new Map(); // vehicleId -> 'left' | 'right'
+const analyticsMarkers = new Map();
 
 /**
  * Category-based color mapping:
@@ -527,6 +533,83 @@ function syncAllMarkersFromState() {
   syncAllRoutesFromState();
 }
 
+function getArrivalTierClass(mins) {
+  if (mins <= 5) return 'tier-green';
+  if (mins <= 8) return 'tier-yellow';
+  if (mins <= 12) return 'tier-orange';
+  return 'tier-red';
+}
+
+function renderArrivalAnalyticsBadges() {
+  if (!analyticsMarkerLayer) return;
+  analyticsMarkerLayer.clearLayers();
+  analyticsMarkers.clear();
+
+  if (!showArrivalAnalytics) return;
+
+  const state = getState();
+  const areas = state.traffic?.areasAnalytics || {};
+
+  Object.entries(areas).forEach(([areaKey, data]) => {
+    if (!data || !data.lat || !data.lng) return;
+
+    const avg = data.averageArrivalMinutes || 8;
+    const tierClass = getArrivalTierClass(avg);
+    const badgeHtml = `
+      <div class="analytics-map-badge ${tierClass}" title="Click for arrival analytics in ${data.displayName || areaKey}">
+        <span class="badge-dot"></span>
+        <strong>${avg}m</strong>
+        <span>${data.displayName || areaKey}</span>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      className: 'urban-analytics-marker',
+      html: badgeHtml,
+      iconSize: [110, 26],
+      iconAnchor: [55, 13]
+    });
+
+    const popupHtml = `
+      <div class="analytics-popup-body">
+        <div class="analytics-popup-header">${data.displayName || areaKey}</div>
+        <div class="analytics-popup-row">
+          <span>Average Cab Arrival:</span>
+          <strong>${avg} min</strong>
+        </div>
+        <div class="analytics-popup-row">
+          <span>Assignment Delay:</span>
+          <strong>~${data.averageAssignmentDelayMinutes || 1.2} min</strong>
+        </div>
+        <div class="analytics-popup-row">
+          <span>Morning Peak (07:30–11:00):</span>
+          <strong>${data.morningPeakAverage || Math.round(avg * 1.3)} min</strong>
+        </div>
+        <div class="analytics-popup-row">
+          <span>Evening Peak (16:30–20:30):</span>
+          <strong>${data.eveningPeakAverage || Math.round(avg * 1.4)} min</strong>
+        </div>
+        <div class="analytics-popup-row">
+          <span>Normal Hours:</span>
+          <strong>${data.normalHoursAverage || Math.round(avg * 0.9)} min</strong>
+        </div>
+        <div class="analytics-popup-row" style="margin-top: 0.35rem; font-size: 10px; color: #64748B;">
+          <span>Data Source:</span>
+          <span class="arrival-source-pill ${data.isBaseline ? 'baseline' : 'actual'}">${data.sourceLabel || (data.isBaseline ? 'Simulated baseline' : `${data.sampleCount} rides`)}</span>
+        </div>
+        <div class="analytics-popup-disclaimer">
+          ${data.disclaimer || 'Average arrival time is calculated from previous simulated rides originating from this pickup area. It is not a guaranteed arrival time for your current booking.'}
+        </div>
+      </div>
+    `;
+
+    const marker = L.marker([data.lat, data.lng], { icon, zIndexOffset: 350 });
+    marker.bindPopup(popupHtml, { maxWidth: 280, className: 'clean-leaflet-popup' });
+    marker.addTo(analyticsMarkerLayer);
+    analyticsMarkers.set(areaKey, marker);
+  });
+}
+
 export function initMap() {
   const container = document.getElementById('map-container');
   if (!container || typeof L === 'undefined') return;
@@ -548,9 +631,25 @@ export function initMap() {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(mapInstance);
 
+  // Dedicated traffic layer pane (zIndex: 300: above OSM base tiles at 200, below vector routes at 400 and markers at 600)
+  mapInstance.createPane('trafficPane');
+  const trafficPane = mapInstance.getPane('trafficPane');
+  if (trafficPane) {
+    trafficPane.style.zIndex = '300';
+    trafficPane.style.pointerEvents = 'none';
+  }
+
+  trafficTileLayer = L.tileLayer('/api/traffic/tiles/{z}/{x}/{y}.png', {
+    pane: 'trafficPane',
+    maxZoom: 19,
+    opacity: 0.85,
+    attribution: '&copy; TomTom Traffic'
+  });
+
   routeLayerGroup = L.layerGroup().addTo(mapInstance);
   passengerLayer = L.layerGroup().addTo(mapInstance);
   vehicleLayer = L.layerGroup().addTo(mapInstance);
+  analyticsMarkerLayer = L.layerGroup().addTo(mapInstance);
 
   syncAllMarkersFromState();
 
@@ -558,6 +657,9 @@ export function initMap() {
   subscribe((state, changeType, payload) => {
     if (changeType === 'data:loaded') {
       syncAllMarkersFromState();
+      renderArrivalAnalyticsBadges();
+    } else if (changeType === 'analytics:updated') {
+      renderArrivalAnalyticsBadges();
     } else if ((changeType === 'vehicle:updated' || changeType === 'cab:location') && payload) {
       updateVehicleMarker(payload);
       applyVehicleFilter();
@@ -572,9 +674,11 @@ export function initMap() {
     } else if (changeType === 'state:reset' || changeType === 'simulation:cleared') {
       clearAllPassengerMarkersAndRoutes();
       syncAllMarkersFromState();
+      renderArrivalAnalyticsBadges();
       resetMapView();
     } else if (changeType === 'simulation:completed') {
       syncAllMarkersFromState();
+      renderArrivalAnalyticsBadges();
     }
   });
 
@@ -599,6 +703,38 @@ export function initMap() {
 
   const passengersBtn = document.getElementById('map-passengers-toggle');
   const vehiclesBtn = document.getElementById('map-vehicles-toggle');
+  const trafficBtn = document.getElementById('map-traffic-toggle');
+  const analyticsBtn = document.getElementById('map-analytics-toggle');
+  const trafficLegend = document.getElementById('traffic-heatmap-legend');
+
+  trafficBtn?.addEventListener('click', () => {
+    showTrafficHeatmap = !showTrafficHeatmap;
+    trafficBtn.classList.toggle('active', showTrafficHeatmap);
+    if (trafficLegend) trafficLegend.classList.toggle('hidden', !showTrafficHeatmap);
+
+    if (showTrafficHeatmap) {
+      trafficTileLayer.addTo(mapInstance);
+      if (!trafficRefreshInterval) {
+        trafficRefreshInterval = setInterval(() => {
+          if (showTrafficHeatmap && trafficTileLayer) {
+            trafficTileLayer.redraw();
+          }
+        }, 3 * 60 * 1000);
+      }
+    } else {
+      mapInstance.removeLayer(trafficTileLayer);
+      if (trafficRefreshInterval) {
+        clearInterval(trafficRefreshInterval);
+        trafficRefreshInterval = null;
+      }
+    }
+  });
+
+  analyticsBtn?.addEventListener('click', () => {
+    showArrivalAnalytics = !showArrivalAnalytics;
+    analyticsBtn.classList.toggle('active', showArrivalAnalytics);
+    renderArrivalAnalyticsBadges();
+  });
 
   passengersBtn?.addEventListener('click', () => {
     showPassengers = !showPassengers;

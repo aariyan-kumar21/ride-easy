@@ -135,6 +135,17 @@ function updateClockUI(simulation) {
     }
   }
 
+  // Peak Rush Hour detection: Morning (7:30–11:00 AM) & Evening (4:30–8:30 PM)
+  const totalMins = hour * 60 + minute;
+  const isMorningPeak = totalMins >= (7 * 60 + 30) && totalMins < (11 * 60);
+  const isEveningPeak = totalMins >= (16 * 60 + 30) && totalMins <= (20 * 60 + 30);
+  const isPeakRushHour = isMorningPeak || isEveningPeak || Boolean(simulation?.isPeakRushHour);
+
+  const peakAlertEl = document.getElementById('peak-rush-hour-alert');
+  if (peakAlertEl) {
+    peakAlertEl.classList.toggle('hidden', !isPeakRushHour);
+  }
+
   // Sync custom time input if not focused
   const customPicker = document.getElementById('custom-time-picker');
   if (customPicker && document.activeElement !== customPicker) {

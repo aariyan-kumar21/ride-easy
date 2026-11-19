@@ -119,12 +119,43 @@
                   type="text"
                   value="Cubbon Park Metro"
                   placeholder="Enter pickup location"
+                  autocomplete="off"
                   required
                 />
               </div>
+              <!-- Floating Location Suggestion List with Arrival Estimates -->
+              <div id="pickup-suggestions-dropdown" class="location-suggestions-dropdown hidden" role="listbox"></div>
+
+              <!-- Pickup Area Average Cab Arrival Time Card -->
+              <div id="pickup-arrival-card" class="pickup-arrival-card">
+                <div class="arrival-card-header">
+                  <div class="arrival-stat-left">
+                    <span class="arrival-clock-icon"><i data-lucide="clock"></i></span>
+                    <div class="arrival-stat-meta">
+                      <span class="arrival-stat-title">Avg Cab Arrival</span>
+                      <strong id="pickup-avg-arrival-value" class="arrival-time-digits">~6 min</strong>
+                    </div>
+                  </div>
+                  <span id="pickup-source-badge" class="arrival-source-pill baseline" title="Source of data">Simulated baseline</span>
+                </div>
+                <div class="arrival-card-subinfo">
+                  <span id="pickup-delay-value" class="arrival-sub-delay">Assign delay: ~1.0m</span>
+                  <div class="arrival-info-tooltip-wrap">
+                    <button type="button" class="arrival-info-btn" aria-label="Arrival Analytics Info" title="Average arrival time is calculated from previous simulated rides originating from this pickup area. It is not a guaranteed arrival time for your current booking.">
+                      <i data-lucide="info"></i>
+                    </button>
+                    <div class="arrival-tooltip-content">
+                      Average arrival time is calculated from previous simulated rides originating from this pickup area. It is not a guaranteed arrival time for your current booking.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="preset-chips-row" data-target="pickup-input">
                 <button type="button" class="preset-chip" data-value="Cubbon Park Metro">Cubbon Park</button>
                 <button type="button" class="preset-chip" data-value="Koramangala 4th Block">Koramangala</button>
+                <button type="button" class="preset-chip" data-value="Indiranagar 100ft Rd">Indiranagar</button>
+                <button type="button" class="preset-chip" data-value="Whitefield ITPL">Whitefield</button>
                 <button type="button" class="preset-chip" data-value="Majestic Bus Station">Majestic</button>
               </div>
             </div>
@@ -253,6 +284,14 @@
               <button type="button" id="map-zoom-out-btn" class="map-icon-btn" title="Zoom Out">
                 <i data-lucide="minus"></i>
               </button>
+              <button type="button" id="map-traffic-toggle" class="map-filter-btn" title="Toggle Real-Time Bengaluru Traffic Heatmap">
+                <i data-lucide="activity"></i>
+                <span>Traffic Heatmap</span>
+              </button>
+              <button type="button" id="map-analytics-toggle" class="map-filter-btn" title="Toggle Arrival Analytics Map Badges">
+                <i data-lucide="bar-chart-2"></i>
+                <span>Arrival Analytics</span>
+              </button>
               <button type="button" id="map-vehicles-toggle" class="map-filter-btn active" title="Toggle Fleet">
                 <i data-lucide="car"></i>
                 <span>Fleet</span>
@@ -266,6 +305,32 @@
 
           <!-- Leaflet Map Canvas -->
           <div id="map-container" aria-label="Bengaluru Interactive Dispatch Map"></div>
+
+          <!-- FLOATING TRAFFIC HEATMAP LEGEND (Active when Traffic Heatmap is ON) -->
+          <div id="traffic-heatmap-legend" class="floating-traffic-legend hidden" role="region" aria-label="Traffic Heatmap Legend">
+            <div class="traffic-legend-header">
+              <span class="live-dot-pulse"></span>
+              <strong class="traffic-legend-title">Bengaluru Live Traffic Flow</strong>
+            </div>
+            <div class="traffic-legend-chips">
+              <div class="traffic-chip green" title="Free-flowing traffic (< 15% delay)">
+                <span class="chip-dot green"></span>
+                <span>Free-flowing</span>
+              </div>
+              <div class="traffic-chip yellow" title="Moderate traffic (15 - 30% delay)">
+                <span class="chip-dot yellow"></span>
+                <span>Moderate</span>
+              </div>
+              <div class="traffic-chip orange" title="Slow traffic (30 - 50% delay)">
+                <span class="chip-dot orange"></span>
+                <span>Slow</span>
+              </div>
+              <div class="traffic-chip red" title="Heavy congestion (> 50% delay)">
+                <span class="chip-dot red"></span>
+                <span>Heavy Congestion</span>
+              </div>
+            </div>
+          </div>
 
           <!-- FLOATING MAP LEGEND (White Rounded Bar at Bottom) -->
           <div class="floating-map-legend" role="region" aria-label="Map Legend">
@@ -459,6 +524,17 @@
           </div>
 
           <div class="time-traffic-body">
+            <!-- PEAK RUSH HOUR ALERT BANNER (Detected during 7:30-11:00 AM & 4:30-8:30 PM) -->
+            <div id="peak-rush-hour-alert" class="peak-rush-alert-box hidden" role="alert">
+              <div class="peak-rush-badge">
+                <i data-lucide="alert-triangle"></i>
+                <span>PEAK RUSH HOUR</span>
+              </div>
+              <p class="peak-rush-message">
+                Bengaluru is currently experiencing peak traffic. Cab arrival times may be longer than usual due to increased traffic and demand.
+              </p>
+            </div>
+
             <!-- Active Condition Banner -->
             <div id="traffic-condition-banner" class="traffic-condition-box">
               <div class="traffic-cond-left">

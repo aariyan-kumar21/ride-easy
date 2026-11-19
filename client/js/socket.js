@@ -5,6 +5,7 @@ import {
   applyCabStatus,
   applyQueueUpdated,
   applySimulationState,
+  applyAnalyticsUpdated,
   loadInitialData
 } from './state.js';
 
@@ -57,6 +58,7 @@ export function initSocket() {
   socket.on('cab:status', (vehicle) => applyCabStatus(vehicle));
   socket.on('queue:updated', (payload) => applyQueueUpdated(payload?.queue || []));
   socket.on('simulation:state', (simState) => applySimulationState(simState));
+  socket.on('analytics:updated', (payload) => applyAnalyticsUpdated(payload));
   socket.on('allocation:completed', () => {
     loadInitialData();
   });

@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const { calculatePriority, sortWaitingBookings, sortRequestsByPriority, updateQueuePositions } = require('./priority.service');
 const defaultRoutingService = require('./routing.service');
+const analyticsService = require('./analytics.service');
 
 // In-process mutex to serialize allocation cycles and guarantee strict sequential reservation
 let allocationMutex = Promise.resolve();
@@ -47,7 +48,7 @@ async function calculateVehicleETA(vehicle, pickup, routingService = defaultRout
  * Attempt to atomically reserve one of the ranked candidate vehicles.
  * Releases reservation if updating the booking fails.
  */
-async function reserveBestCandidate(booking, rankedCandidates, BookingModel, VehicleModel) {
+async function reserveBestCandidate(booking, rankedCandidates, BookingModel, VehicleModel, now = new Date()) {
   for (const candidate of rankedCandidates) {
     const reservedVehicle = await VehicleModel.findOneAndUpdate(
       {
@@ -70,6 +71,7 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
     }
 
     try {
+      const assignedAt = now instanceof Date ? now : new Date(now);
       const updatedBooking = await BookingModel.findOneAndUpdate(
         {
           bookingId: booking.bookingId,
@@ -79,6 +81,7 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
           $set: {
             status: 'assigned',
             vehicleId: reservedVehicle.vehicleId,
+            vehicleAssignedAt: assignedAt,
             priorityTier: booking.priorityTier,
             priorityTierLabel: booking.priorityTierLabel,
             priorityScore: booking.priorityScore,
@@ -104,6 +107,8 @@ async function reserveBestCandidate(booking, rankedCandidates, BookingModel, Veh
         );
         return null;
       }
+
+      analyticsService.recordVehicleAssigned(booking.bookingId, assignedAt);
 
       return {
         booking: updatedBooking,
@@ -217,7 +222,8 @@ async function executeAllocationCycle(options = {}) {
       booking,
       candidatesWithEta,
       BookingModel,
-      VehicleModel
+      VehicleModel,
+      now
     );
 
     if (reservation) {

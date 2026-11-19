@@ -5,6 +5,7 @@ const { calculatePriority, updateQueuePositions } = require('../services/priorit
 const { runAllocationCycle } = require('../services/allocation.service');
 const { getRouteEstimate } = require('../services/routing.service');
 const { removeVehicleTrack, getSimulationTime, getSimulationClockSeconds } = require('../services/simulation.service');
+const analyticsService = require('../services/analytics.service');
 const socketHandler = require('../sockets/socket.handler');
 
 const INDIAN_NAME_POOLS = {
@@ -169,6 +170,8 @@ async function createBooking(req, res, next) {
       waitingMinutes: 0
     });
 
+    analyticsService.recordBookingCreated(booking);
+
     let allocationResult = { allocated: [], queued: [] };
     if (req.body.autoAllocate === true) {
       allocationResult = await runAllocationCycle({ now: simTime });
@@ -227,6 +230,7 @@ async function cancelBooking(req, res, next) {
 
     const simTime = getSimulationTime();
     const assignedVehicleId = booking.vehicleId;
+    analyticsService.recordCancellation(booking.bookingId);
     booking.status = 'cancelled';
     booking.vehicleId = null;
     booking.queuePosition = null;

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "savedAt": "2026-11-19T13:49:39.283Z",
+  "count": 1,
+  "recordedArrivals": [
+    {
+      "bookingId": "BK-SIM-2",
+      "area": "Cubbon Park",
+      "pickupLabel": "Pickup",
+      "vehicleType": "cab",
+      "bookingCreatedAt": "2026-11-12T08:22:01.000Z",
+      "vehicleAssignedAt": "2026-11-12T08:23:01.000Z",
+      "vehicleArrivedAt": "2026-11-12T08:30:01.000Z",
+      "arrivalDurationSeconds": 480,
+      "arrivalDurationMinutes": 8,
+      "assignmentDelaySeconds": 60,
+      "assignmentDelayMinutes": 1,
+      "timePeriod": "normal",
+      "isMorningPeak": false,
+      "isEveningPeak": false,
+      "recordedAt": "2026-11-19T13:49:37.276Z"
+    }
+  ]
+}

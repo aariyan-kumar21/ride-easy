@@ -5,6 +5,7 @@ const { resetAll } = require('../store/memoryStore');
 const defaultRoutingService = require('./routing.service');
 const defaultAllocationService = require('./allocation.service');
 const defaultPriorityService = require('./priority.service');
+const analyticsService = require('./analytics.service');
 const { getTimeCategory, TIME_CATEGORIES, TIME_PRESETS } = require('../config/priority.config');
 
 const TICK_INTERVAL_MS = 500;
@@ -28,6 +29,7 @@ let simulatedTimeDate = new Date(BASE_SIM_DATE);
 let simulatedTimeISO = simulatedTimeDate.toISOString();
 let currentTimeCategory = getTimeCategory(14, 0);
 let simulatedTimeLabel = currentTimeCategory.label;
+let lastPeakHourState = false;
 
 function getSocketEmitter() {
   try {
@@ -71,6 +73,15 @@ function setClockBySeconds(totalSeconds) {
   const prevCategory = currentTimeCategory;
   currentTimeCategory = getTimeCategory(hours, minutes);
   simulatedTimeLabel = currentTimeCategory.label;
+
+  const periodInfo = analyticsService.getTimePeriod(simClockSeconds);
+  if (periodInfo.isPeakHour && !lastPeakHourState) {
+    pushNotification(
+      'peak_traffic',
+      'PEAK RUSH HOUR — Bengaluru is currently experiencing peak traffic. Cab arrival times may be longer than usual due to increased traffic and demand.'
+    );
+  }
+  lastPeakHourState = periodInfo.isPeakHour;
 
   return {
     hours,
@@ -370,10 +381,12 @@ async function stepSimulation(options = {}) {
     if (track.distanceTraveled >= track.profile.totalDistance) {
       if (track.phase === 'to_pickup') {
         // 1. Reached pickup -> arrived
+        const arrivedSimTime = getSimulationTime();
         await BookingModel.updateOne(
           { bookingId: booking.bookingId },
-          { $set: { status: 'arrived' } }
+          { $set: { status: 'arrived', vehicleArrivedAt: arrivedSimTime } }
         );
+        analyticsService.recordVehicleArrived(booking, arrivedSimTime);
         await VehicleModel.updateOne(
           { vehicleId },
           { $set: { status: 'assigned' } }
@@ -411,6 +424,7 @@ async function stepSimulation(options = {}) {
           const updatedVehicle = await VehicleModel.findOne({ vehicleId });
           if (updatedBooking) emitter.emitBookingUpdated(updatedBooking);
           if (updatedVehicle) emitter.emitCabStatus(updatedVehicle);
+          emitter.emitAnalyticsUpdated(analyticsService.getAllAreasAnalytics());
           emitter.emitSimulationState(getSimulationState());
         }
       } else if (track.phase === 'on_trip') {
@@ -641,6 +655,8 @@ function getSimulationState() {
   const seconds = simClockSeconds % 60;
   const timeFormatted = [hours, minutes, seconds].map((v) => String(v).padStart(2, '0')).join(':');
 
+  const periodInfo = analyticsService.getTimePeriod(simClockSeconds);
+
   return {
     status: simStatus,
     speed: simSpeed,
@@ -651,6 +667,11 @@ function getSimulationState() {
     simulatedTimeLabel: currentTimeCategory ? currentTimeCategory.label : simulatedTimeLabel,
     timeCategory: currentTimeCategory,
     isNightHours: Boolean(currentTimeCategory && currentTimeCategory.isNight),
+    isPeakRushHour: Boolean(periodInfo.isPeakHour),
+    peakPeriod: periodInfo.period,
+    peakRushHourMessage: periodInfo.isPeakHour
+      ? 'PEAK RUSH HOUR — Bengaluru is currently experiencing peak traffic. Cab arrival times may be longer than usual due to increased traffic and demand.'
+      : null,
     timeCategories: TIME_CATEGORIES,
     timePresets: TIME_PRESETS,
     activeTracksCount: activeTracks.size,

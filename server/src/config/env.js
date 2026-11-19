@@ -8,7 +8,8 @@ const env = {
   port: Number(process.env.PORT) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5500',
-  osrmBaseUrl: process.env.OSRM_BASE_URL || 'https://router.project-osrm.org'
+  osrmBaseUrl: process.env.OSRM_BASE_URL || 'https://router.project-osrm.org',
+  tomtomApiKey: process.env.TOMTOM_API_KEY || ''
 };
 
 module.exports = env;

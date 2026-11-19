@@ -1,4 +1,4 @@
-import { createBooking } from './state.js';
+import { createBooking, getState, subscribe } from './state.js';
 
 const LOCATION_COORDS = {
   'Cubbon Park Metro': [12.9742, 77.6012],
@@ -10,11 +10,96 @@ const LOCATION_COORDS = {
   'MG Road Metro Station': [12.9756, 77.6066],
   'Kempegowda Bus Station (Majestic)': [12.9767, 77.5713],
   'Whitefield ITPL': [12.9855, 77.7362],
+  'Electronic City Phase 1': [12.8452, 77.6602],
+  'Marathahalli Bridge': [12.9591, 77.6974],
+  'BTM Layout 2nd Stage': [12.9166, 77.6101],
+  'Hebbal Flyover': [13.0358, 77.5970],
   'Jayanagar 4th Block': [12.9304, 77.5830],
   'Malleshwaram 8th Cross': [12.9982, 77.5685],
   'Vidhana Soudha': [12.9796, 77.5907],
   'Richmond Circle': [12.9660, 77.5998]
 };
+
+const POPULAR_LOCATIONS = [
+  { label: 'Cubbon Park Metro', area: 'Cubbon Park' },
+  { label: 'Koramangala 4th Block', area: 'Koramangala' },
+  { label: 'Indiranagar 100ft Rd', area: 'Indiranagar' },
+  { label: 'Whitefield ITPL', area: 'Whitefield' },
+  { label: 'Electronic City Phase 1', area: 'Electronic City' },
+  { label: 'Marathahalli Bridge', area: 'Marathahalli' },
+  { label: 'BTM Layout 2nd Stage', area: 'BTM Layout' },
+  { label: 'Hebbal Flyover', area: 'Hebbal' },
+  { label: 'Majestic Bus Station', area: 'Majestic' },
+  { label: 'MG Road Boulevard', area: 'MG Road' },
+  { label: 'Jayanagar 4th Block', area: 'Jayanagar' },
+  { label: 'Malleshwaram 8th Cross', area: 'Malleshwaram' },
+  { label: 'Vidhana Soudha', area: 'Vidhana Soudha' },
+  { label: 'Richmond Circle', area: 'Richmond Circle' },
+  { label: 'Manipal Hospital, HAL', area: 'HAL' }
+];
+
+function matchAreaName(label) {
+  if (!label || typeof label !== 'string') return 'Cubbon Park';
+  const clean = label.trim().toLowerCase();
+  if (clean.includes('indiranagar')) return 'Indiranagar';
+  if (clean.includes('koramangala')) return 'Koramangala';
+  if (clean.includes('whitefield') || clean.includes('itpl')) return 'Whitefield';
+  if (clean.includes('electronic city') || clean.includes('ecity')) return 'Electronic City';
+  if (clean.includes('marathahalli')) return 'Marathahalli';
+  if (clean.includes('btm')) return 'BTM Layout';
+  if (clean.includes('hebbal')) return 'Hebbal';
+  if (clean.includes('mg road')) return 'MG Road';
+  if (clean.includes('cubbon')) return 'Cubbon Park';
+  if (clean.includes('majestic') || clean.includes('kempegowda')) return 'Majestic';
+  if (clean.includes('jayanagar')) return 'Jayanagar';
+  if (clean.includes('malleshwaram')) return 'Malleshwaram';
+  if (clean.includes('vidhana')) return 'Vidhana Soudha';
+  if (clean.includes('richmond')) return 'Richmond Circle';
+  if (clean.includes('manipal') || clean.includes('hal')) return 'HAL';
+  return 'Cubbon Park';
+}
+
+function updatePickupArrivalAnalyticsCard(pickupLabel, vehicleType = 'cab') {
+  const card = document.getElementById('pickup-arrival-card');
+  const avgValEl = document.getElementById('pickup-avg-arrival-value');
+  const sourceBadgeEl = document.getElementById('pickup-source-badge');
+  const delayValEl = document.getElementById('pickup-delay-value');
+  if (!card) return;
+
+  const areaKey = matchAreaName(pickupLabel);
+  const state = getState();
+  const areaData = state.traffic?.areasAnalytics?.[areaKey];
+
+  if (!areaData) {
+    if (avgValEl) avgValEl.textContent = '~6 min';
+    if (sourceBadgeEl) {
+      sourceBadgeEl.textContent = 'Simulated baseline';
+      sourceBadgeEl.className = 'arrival-source-pill baseline';
+    }
+    if (delayValEl) delayValEl.textContent = 'Assign delay: ~1.0m';
+    return;
+  }
+
+  const avgMin = areaData.averageArrivalMinutes || 6;
+  const delayMin = areaData.averageAssignmentDelayMinutes || 1.1;
+
+  if (avgValEl) {
+    avgValEl.textContent = `~${avgMin} min`;
+  }
+
+  if (sourceBadgeEl) {
+    const isBase = Boolean(areaData.isBaseline);
+    sourceBadgeEl.textContent = isBase ? 'Simulated baseline' : `Based on ${areaData.sampleCount} rides`;
+    sourceBadgeEl.className = `arrival-source-pill ${isBase ? 'baseline' : 'actual'}`;
+    sourceBadgeEl.title = isBase
+      ? 'Awaiting minimum sample size of 5 rides. Showing simulated baseline.'
+      : `Calculated from ${areaData.sampleCount} completed simulated rides in this area.`;
+  }
+
+  if (delayValEl) {
+    delayValEl.textContent = `Assign delay: ~${delayMin}m`;
+  }
+}
 
 function showFeedback(el, message, isError = false) {
   if (!el) return;
@@ -41,6 +126,8 @@ export function initBookingPanel() {
   const tileAuto = document.getElementById('vehicle-tile-auto');
 
   const passengerCountGroup = document.getElementById('passenger-count-group');
+  const pickupInput = document.getElementById('pickup-input');
+  const suggestionsDropdown = document.getElementById('pickup-suggestions-dropdown');
 
   function getSelectedVehicle() {
     return form?.querySelector('input[name="vehicleType"]:checked')?.value || 'cab';
@@ -116,6 +203,7 @@ export function initBookingPanel() {
     tileAuto?.classList.remove('active');
     const radio = tileCab.querySelector('input[type="radio"]');
     if (radio) radio.checked = true;
+    updatePickupArrivalAnalyticsCard(pickupInput?.value || '', 'cab');
   });
 
   tileAuto?.addEventListener('click', () => {
@@ -132,6 +220,7 @@ export function initBookingPanel() {
         setPassengerCount(3, true);
       }
     }
+    updatePickupArrivalAnalyticsCard(pickupInput?.value || '', 'auto');
   });
 
   // Location Preset Chips
@@ -140,10 +229,81 @@ export function initBookingPanel() {
     const input = document.getElementById(targetId);
     group.querySelectorAll('.preset-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        if (input) input.value = chip.dataset.value || '';
+        if (input) {
+          input.value = chip.dataset.value || '';
+          if (targetId === 'pickup-input') {
+            updatePickupArrivalAnalyticsCard(input.value, getSelectedVehicle());
+          }
+        }
       });
     });
   });
+
+  // Autocomplete / Dropdown with Arrival Analytics for Pickup Location
+  function renderSuggestions(query = '') {
+    if (!suggestionsDropdown) return;
+    const clean = query.trim().toLowerCase();
+    const matches = POPULAR_LOCATIONS.filter((loc) =>
+      loc.label.toLowerCase().includes(clean) || loc.area.toLowerCase().includes(clean)
+    );
+
+    if (matches.length === 0) {
+      suggestionsDropdown.classList.add('hidden');
+      suggestionsDropdown.innerHTML = '';
+      return;
+    }
+
+    const state = getState();
+    const areas = state.traffic?.areasAnalytics || {};
+
+    suggestionsDropdown.innerHTML = matches.map((loc) => {
+      const areaData = areas[loc.area];
+      const avg = areaData ? areaData.averageArrivalMinutes : 8;
+      return `
+        <div class="location-suggestion-item" data-value="${loc.label}">
+          <span>${loc.label}</span>
+          <span class="suggestion-area-badge">~${avg}m avg</span>
+        </div>
+      `;
+    }).join('');
+
+    suggestionsDropdown.querySelectorAll('.location-suggestion-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        if (pickupInput) {
+          pickupInput.value = item.dataset.value;
+          updatePickupArrivalAnalyticsCard(pickupInput.value, getSelectedVehicle());
+        }
+        suggestionsDropdown.classList.add('hidden');
+      });
+    });
+
+    suggestionsDropdown.classList.remove('hidden');
+  }
+
+  pickupInput?.addEventListener('input', () => {
+    updatePickupArrivalAnalyticsCard(pickupInput.value, getSelectedVehicle());
+    renderSuggestions(pickupInput.value);
+  });
+
+  pickupInput?.addEventListener('focus', () => {
+    renderSuggestions(pickupInput.value);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (suggestionsDropdown && !suggestionsDropdown.contains(e.target) && e.target !== pickupInput) {
+      suggestionsDropdown.classList.add('hidden');
+    }
+  });
+
+  // Subscribe to state updates to keep pickup analytics card updated
+  subscribe((_state, changeType) => {
+    if (changeType === 'analytics:updated' || changeType === 'data:loaded') {
+      updatePickupArrivalAnalyticsCard(pickupInput?.value || '', getSelectedVehicle());
+    }
+  });
+
+  // Initial update
+  updatePickupArrivalAnalyticsCard(pickupInput?.value || 'Cubbon Park Metro', 'cab');
 
   // Form Submit
   form?.addEventListener('submit', async (event) => {

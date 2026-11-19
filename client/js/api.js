@@ -60,6 +60,11 @@ export const api = {
   generateScenario: (name) =>
     request(`/api/simulation/scenarios/${encodeURIComponent(name)}/generate`, {
       method: 'POST'
-    })
+    }),
+  getTrafficStatus: () => request('/api/traffic/status'),
+  getArrivalAnalytics: (vehicleType = 'cab') =>
+    request(`/api/analytics/arrival-times?vehicleType=${encodeURIComponent(vehicleType)}`),
+  getAreaArrivalAnalytics: (area, vehicleType = 'cab') =>
+    request(`/api/analytics/arrival-times/${encodeURIComponent(area)}?vehicleType=${encodeURIComponent(vehicleType)}`)
 };
 

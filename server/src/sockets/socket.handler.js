@@ -52,6 +52,10 @@ function emitAllocationCompleted(result) {
   safeEmit('allocation:completed', result);
 }
 
+function emitAnalyticsUpdated(payload) {
+  safeEmit('analytics:updated', payload);
+}
+
 async function buildQueueSnapshot() {
   const now = simulationService.getSimulationTime();
   const queueResult = await updateQueuePositions({ now });
@@ -355,6 +359,7 @@ module.exports = {
   emitQueueUpdated,
   emitSimulationState,
   emitAllocationCompleted,
+  emitAnalyticsUpdated,
   broadcastQueueSnapshot,
   sendFullSync
 };

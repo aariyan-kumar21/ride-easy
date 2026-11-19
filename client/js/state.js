@@ -165,6 +165,14 @@ let store = {
     timeCategory: { id: 'normal_daytime', label: 'Normal Daytime', isNight: false, hoursRange: '11:00–15:59' },
     isNightHours: false,
     notifications: []
+  },
+  traffic: {
+    status: null,
+    heatmapEnabled: false,
+    analyticsLayerEnabled: false,
+    areasAnalytics: {},
+    isPeakRushHour: false,
+    peakRushHourMessage: null
   }
 };
 
@@ -248,18 +256,29 @@ export async function loadInitialData() {
   notify('loading:changed', true);
 
   try {
-    const [healthRes, vehiclesRes, bookingsRes, queueRes, statsRes] = await Promise.all([
+    const [healthRes, vehiclesRes, bookingsRes, queueRes, statsRes, trafficRes, analyticsRes] = await Promise.all([
       api.getHealth().catch(() => ({ status: 'unknown' })),
       api.getVehicles(),
       api.getBookings(),
       api.getQueue(),
-      api.getAdminStats()
+      api.getAdminStats(),
+      api.getTrafficStatus().catch(() => ({ configured: false })),
+      api.getArrivalAnalytics().catch(() => ({ areas: {} }))
     ]);
 
     store.vehicles = (vehiclesRes.vehicles || []).map(mapVehicle);
     store.bookings = deduplicateBookings((bookingsRes.bookings || []).map(mapBooking));
     store.queue = deduplicateQueue((queueRes.queue || []).map(mapQueueItem));
     store.stats = statsRes;
+    if (trafficRes) {
+      store.traffic.status = trafficRes;
+    }
+    if (analyticsRes && analyticsRes.areas) {
+      store.traffic.areasAnalytics = analyticsRes.areas;
+      if (analyticsRes.isPeakRushHour !== undefined) {
+        store.traffic.isPeakRushHour = Boolean(analyticsRes.isPeakRushHour);
+      }
+    }
     store.loading = false;
     if (healthRes.status !== 'ok') {
       store.error = 'Backend server is not responding correctly.';
@@ -446,6 +465,10 @@ export function applySimulationState(sim) {
     const seconds = (store.simulation.clockSeconds || 0) % 60;
     store.simulation.timeFormatted = [hours, minutes, seconds].map((v) => String(v).padStart(2, '0')).join(':');
     store.simulation.notifications = sim.notifications || store.simulation.notifications;
+    if (sim.isPeakRushHour !== undefined) {
+      store.traffic.isPeakRushHour = Boolean(sim.isPeakRushHour);
+      store.traffic.peakRushHourMessage = sim.peakRushHourMessage || null;
+    }
     notify('simulation:updated', store.simulation);
   }
 }
@@ -582,3 +605,41 @@ export async function clearSimulation() {
   notify('simulation:cleared', res);
   return res;
 }
+
+export function applyAnalyticsUpdated(payload) {
+  if (!payload) return;
+  if (payload.areas) {
+    store.traffic.areasAnalytics = payload.areas;
+  }
+  if (payload.isPeakRushHour !== undefined) {
+    store.traffic.isPeakRushHour = Boolean(payload.isPeakRushHour);
+  }
+  notify('analytics:updated', store.traffic);
+}
+
+export function setTrafficHeatmapEnabled(enabled) {
+  store.traffic.heatmapEnabled = Boolean(enabled);
+  notify('traffic:heatmap_toggled', store.traffic);
+}
+
+export function setArrivalAnalyticsLayerEnabled(enabled) {
+  store.traffic.analyticsLayerEnabled = Boolean(enabled);
+  notify('traffic:analytics_toggled', store.traffic);
+}
+
+export async function refreshArrivalAnalytics(vehicleType = 'cab') {
+  try {
+    const res = await api.getArrivalAnalytics(vehicleType);
+    if (res && res.areas) {
+      store.traffic.areasAnalytics = res.areas;
+      if (res.isPeakRushHour !== undefined) {
+        store.traffic.isPeakRushHour = Boolean(res.isPeakRushHour);
+      }
+      notify('analytics:updated', store.traffic);
+    }
+    return res;
+  } catch (err) {
+    console.warn('Failed to refresh arrival analytics:', err);
+  }
+}
+
